@@ -9,14 +9,17 @@
  * extension (.mp4/.mov/.webm) renders as a muted, looping background video
  * instead of an image.
  *
- * Video is served responsively: phones get `SITE_BACKGROUND_VIDEO_MOBILE`
- * (smaller file, lower resolution) via a media-query <source>, everything
- * else gets the full file. The browser picks whichever <source> matches
- * before downloading anything, so phones never fetch the desktop file.
+ * On phones, the video is swapped out entirely for a full-resolution still
+ * frame (SITE_BACKGROUND_STILL_MOBILE) instead of a smaller video file —
+ * some mobile browsers (notably iOS Safari, on cellular or Low Power Mode)
+ * refuse to autoplay even a muted/playsinline video and show a tap-to-play
+ * control instead, which a background layer can't offer. A still avoids
+ * that entirely while looking identical to a paused frame of the video.
  */
 
 const SITE_BACKGROUND_IMAGE = "assets/backgrounds/landscape.mp4";
-const SITE_BACKGROUND_VIDEO_MOBILE = "assets/backgrounds/landscape-mobile.mp4";
+const SITE_BACKGROUND_STILL_MOBILE = "assets/backgrounds/landscape-still.jpg";
+const MOBILE_BREAKPOINT = "(max-width: 768px)";
 
 function renderSiteBackgrounds(path) {
   const container = document.getElementById("siteBg");
@@ -24,19 +27,17 @@ function renderSiteBackgrounds(path) {
 
   const src = path || SITE_BACKGROUND_IMAGE;
   const isVideo = /\.(mp4|mov|webm)$/i.test(src || "");
+  const isMobile = window.matchMedia(MOBILE_BREAKPOINT).matches;
 
   let visual;
-  if (isVideo) {
+  if (isVideo && src === SITE_BACKGROUND_IMAGE && isMobile) {
+    visual = `<img src="${SITE_BACKGROUND_STILL_MOBILE}" alt="" />`;
+  } else if (isVideo) {
     // No `poster` — it would be a lower-resolution still shown while the
     // video loads, undercutting the sharpness we're trying to preserve.
     // preload="auto" + autoplay means the first real frame arrives fast.
-    const mobileSrc = src === SITE_BACKGROUND_IMAGE ? SITE_BACKGROUND_VIDEO_MOBILE : null;
-    const mobileSource = mobileSrc
-      ? `<source src="${mobileSrc}" media="(max-width: 768px)" />`
-      : "";
     visual = `
       <video autoplay muted loop playsinline preload="auto">
-        ${mobileSource}
         <source src="${src}" />
       </video>
     `;
@@ -48,8 +49,8 @@ function renderSiteBackgrounds(path) {
 
   container.innerHTML = `<div class="site-bg__layer media is-active">${visual}</div>`;
 
-  if (isVideo) {
-    const video = container.querySelector("video");
+  const video = container.querySelector("video");
+  if (video) {
     // Pause while the tab is hidden — no point decoding frames no one sees.
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) video.pause();
