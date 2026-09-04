@@ -1,0 +1,969 @@
+/* ============================================================
+   Beyond Sundays — design tokens
+   Warm candlelight + quiet greenery: parchment, gold, soft sage.
+   ============================================================ */
+
+:root {
+  --ink-black: #0f130f;
+  --stage-dark: #171d16;
+  --panel-dark: #202a1f;
+  --panel-dark-2: #263324;
+
+  --parchment: #f3e6c8;
+  --parchment-dim: #d9c8a0;
+  --cream: #f7efe0;
+
+  --gold: #cf9b3d;
+  --gold-bright: #e6b856;
+  --gold-dim: #a67b2e;
+
+  --sage: #7c9b6e;
+  --sage-bright: #9cbb8e;
+  --sage-dim: #5c7a52;
+
+  --shadow-deep: rgba(6, 9, 6, 0.65);
+
+  --font-display: "Playfair Display", "Iowan Old Style", Georgia, serif;
+  --font-serif: "EB Garamond", Georgia, serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --radius-md: 10px;
+  --radius-lg: 18px;
+
+  --container: 1180px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Matches body so overscroll/rubber-band bounce at the top or bottom
+     of the page doesn't flash a mismatched color (e.g. browser default
+     white, or the wrong theme's tone) before the page's own background
+     paints. */
+  background: var(--ink-black);
+}
+
+html:has(body.theme-cream) {
+  background: var(--parchment);
+}
+
+body {
+  margin: 0;
+  background: var(--ink-black);
+  color: var(--parchment);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  margin: 0 0 0.4em;
+  color: var(--cream);
+  letter-spacing: 0.01em;
+}
+
+p {
+  margin: 0 0 1em;
+  color: var(--parchment-dim);
+}
+
+.container {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 clamp(20px, 4vw, 48px);
+}
+
+/* ---------- Navbar ---------- */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px clamp(20px, 4vw, 48px);
+  background: rgba(247, 239, 224, 0.04);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(247, 239, 224, 0.14);
+}
+
+.nav__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--gold-bright);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+.nav__brand span {
+  color: var(--cream);
+  font-family: var(--font-body);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 500;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+.nav__links {
+  display: flex;
+  gap: clamp(16px, 3vw, 34px);
+  font-size: 0.88rem;
+  letter-spacing: 0.03em;
+}
+
+.nav__links a {
+  color: var(--cream);
+  transition: color 0.2s ease;
+  padding-bottom: 3px;
+  border-bottom: 1px solid transparent;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+.nav__links a:hover,
+.nav__links a.is-active {
+  color: var(--gold-bright);
+  border-color: var(--gold-dim);
+}
+
+.nav__toggle {
+  display: none;
+  background: none;
+  border: 1px solid rgba(207, 155, 61, 0.4);
+  color: var(--gold-bright);
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 28px;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn--gold {
+  background: linear-gradient(180deg, #c99a4d, #a97a2e);
+  color: #221808;
+  box-shadow: 0 6px 20px rgba(169, 122, 46, 0.3);
+}
+
+.btn--gold:hover {
+  box-shadow: 0 8px 26px rgba(169, 122, 46, 0.45);
+}
+
+.btn--ghost {
+  background: rgba(247, 239, 224, 0.04);
+  color: var(--cream);
+  border-color: rgba(247, 239, 224, 0.25);
+}
+
+.btn--ghost:hover {
+  background: rgba(247, 239, 224, 0.09);
+  border-color: rgba(247, 239, 224, 0.4);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---------- Hero ---------- */
+
+.hero {
+  position: relative;
+  min-height: min(88vh, 780px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  /* Fallback for pages/states without a photo background (#siteBg
+     overrides this to `none` on index.html so the photo shows through). */
+  background:
+    radial-gradient(ellipse 60% 50% at 30% 20%, rgba(207, 155, 61, 0.14), transparent 60%),
+    radial-gradient(ellipse 80% 60% at 80% 90%, rgba(124, 155, 110, 0.18), transparent 60%),
+    linear-gradient(180deg, var(--ink-black) 0%, var(--stage-dark) 60%, var(--panel-dark) 100%);
+}
+
+.hero__glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 15%, rgba(230, 184, 86, 0.12), transparent 55%),
+    radial-gradient(circle at 15% 85%, rgba(124, 155, 110, 0.14), transparent 60%);
+  animation: flicker 6s ease-in-out infinite;
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  45% { opacity: 0.85; }
+  50% { opacity: 1; }
+  75% { opacity: 0.92; }
+}
+
+/* ---------- Split-letter title (scroll-scrubbed) ---------- */
+
+.split-word {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.split-letter {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+/* ---------- Scroll reveal (one-time, staggered) ---------- */
+
+.reveal {
+  opacity: 0;
+  filter: blur(14px);
+  transform: translateY(26px) scale(0.96);
+  transition: opacity 0.8s cubic-bezier(0.2, 0.7, 0.3, 1),
+    filter 0.8s cubic-bezier(0.2, 0.7, 0.3, 1),
+    transform 0.8s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.reveal.is-in {
+  opacity: 1;
+  filter: blur(0);
+  transform: translateY(0) scale(1);
+}
+
+/* ---------- Stage panel (curtain-rise reveal into main content) ---------- */
+
+.stage-panel {
+  position: relative;
+  border-radius: 28px 28px 0 0;
+  opacity: 0;
+  transform: translateY(56px) scale(0.98);
+  transition: opacity 0.9s cubic-bezier(0.2, 0.7, 0.3, 1),
+    transform 0.9s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.stage-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 140px;
+  background: radial-gradient(ellipse 70% 100% at 50% 0%, rgba(207, 155, 61, 0.08), transparent 70%);
+  pointer-events: none;
+  border-radius: 28px 28px 0 0;
+}
+
+.stage-panel.is-in {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ---------- Ambient embers ---------- */
+
+#embers-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+/* ---------- Full-page scrolling background (index.html) ----------
+   A fixed stack of images, one per section, crossfaded by site-motion.js
+   as you scroll. Negative z-index keeps it behind ordinary page content
+   without needing to touch every element's stacking order. Sections with
+   their own solid backgrounds (cards, panels) still paint over it as
+   normal — only the page's negative space reveals it. */
+
+.site-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+}
+
+.site-bg__layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.site-bg__layer.is-active {
+  opacity: 1;
+}
+
+.site-bg__overlay {
+  position: absolute;
+  inset: 0;
+  /* Deliberately no dark tint — the photo shows through as-is. Legibility
+     over bright sky/cloud comes from text-shadow on the hero copy instead
+     (see .hero__welcome, .hero__brand, .hero__tagline, .hero__kicker). */
+}
+
+body:has(#siteBg) {
+  background: transparent;
+}
+
+body:has(#siteBg) .hero {
+  background: none;
+}
+
+body:has(#siteBg) .stage-panel,
+body:has(#siteBg) .footer {
+  background: transparent;
+}
+
+/* Headings/copy that sit directly on the photo (outside opaque cards)
+   need their own shadow now that there's no dark overlay behind them. */
+body:has(#siteBg) .section__head h2,
+body:has(#siteBg) .section__head p,
+body:has(#siteBg) .footer__row span {
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85), 0 0 24px rgba(0, 0, 0, 0.5);
+}
+
+/* Crisp white-cream for the main page's copy, rather than the muted
+   tan used as body-text default elsewhere on the site. */
+body:has(#siteBg) .section__head p,
+body:has(#siteBg) .poster-card__desc,
+body:has(#siteBg) .footer__row span {
+  color: var(--cream);
+}
+
+.hero__content {
+  position: relative;
+  z-index: 2;
+  padding: 0 clamp(20px, 4vw, 48px);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.hero__kicker {
+  display: inline-block;
+  font-size: 0.72rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+  margin-bottom: 18px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85), 0 0 24px rgba(0, 0, 0, 0.5);
+}
+
+.hero h1 {
+  font-size: clamp(2.6rem, 6vw, 4.6rem);
+  line-height: 1.02;
+  margin-bottom: 18px;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.8), 0 0 48px rgba(0, 0, 0, 0.5);
+}
+
+.hero__welcome {
+  display: block;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(1.2rem, 2.6vw, 1.7rem);
+  color: var(--cream);
+  margin-bottom: 8px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 0, 0, 0.5);
+}
+
+.hero__brand {
+  display: block;
+}
+
+.hero__tagline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+  color: var(--cream);
+  max-width: 520px;
+  margin: 0 auto 30px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 0, 0, 0.5);
+}
+
+.hero__cta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.badge--day {
+  background: rgba(207, 155, 61, 0.14);
+  color: var(--gold-bright);
+  border: 1px solid rgba(207, 155, 61, 0.35);
+}
+
+/* ---------- Section headers ---------- */
+
+.section {
+  padding: 64px 0;
+}
+
+.section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 26px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.section__head h2 {
+  font-size: clamp(1.5rem, 2.6vw, 2.1rem);
+}
+
+.section__head p {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+/* ---------- Poster grid ---------- */
+
+.grid--topics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 26px;
+  /* Without this, grid's default row-stretch interacts badly with the
+     aspect-ratio poster art below and inflates the whole card. */
+  align-items: start;
+}
+
+.poster-card {
+  display: block;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: rgba(247, 239, 224, 0.05);
+  border: 1px solid rgba(247, 239, 224, 0.2);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.poster-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 22px 40px var(--shadow-deep);
+  border-color: rgba(207, 155, 61, 0.4);
+}
+
+.poster-card__art {
+  aspect-ratio: 16 / 9;
+  position: relative;
+}
+
+.poster-card__badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
+
+.poster-card__body {
+  padding: 16px 18px 20px;
+}
+
+.poster-card__title {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  color: var(--cream);
+  margin-bottom: 4px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+.poster-card__meta {
+  font-size: 0.78rem;
+  color: var(--gold-dim);
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+
+.poster-card__desc {
+  font-size: 0.83rem;
+  color: var(--parchment-dim);
+  margin: 0 0 14px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+
+.poster-card__cta {
+  font-size: 0.85rem;
+  padding: 10px 20px;
+}
+
+/* ---------- Media placeholder (dark grey + soft glow) ----------
+   Shared by poster cards, the topic detail poster, and The Story's
+   scene visuals. Drop a real image in and it fills this same slot —
+   see the `image` field in js/data.js / js/story-data.js. */
+
+.media {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: linear-gradient(155deg, #2a2a2d 0%, #18181a 100%);
+}
+
+.media img,
+.media video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.media__glow {
+  position: absolute;
+  inset: 0;
+}
+
+.media__glow span {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.55;
+  background: radial-gradient(circle, rgba(230, 184, 86, 0.9), transparent 70%);
+  animation: glow-drift 9s ease-in-out infinite;
+}
+
+.media__glow span:nth-child(1) { width: 55%; height: 55%; top: 8%; left: 10%; }
+.media__glow span:nth-child(2) {
+  width: 45%; height: 45%; bottom: 10%; right: 14%; animation-delay: 2.5s;
+  background: radial-gradient(circle, rgba(207, 155, 61, 0.75), transparent 70%);
+}
+.media__glow span:nth-child(3) {
+  width: 32%; height: 32%; top: 40%; left: 48%; animation-delay: 5s;
+  background: radial-gradient(circle, rgba(156, 187, 142, 0.5), transparent 70%);
+}
+
+@keyframes glow-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.45; }
+  50% { transform: translate(6%, -6%) scale(1.15); opacity: 0.7; }
+}
+
+/* ---------- Detail / showtime page ---------- */
+
+.topic-intro {
+  position: relative;
+  padding: 150px 0 50px;
+  text-align: center;
+  overflow: hidden;
+}
+
+.topic-intro .back-link {
+  justify-content: center;
+}
+
+.topic-intro h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.topic-intro__subtitle {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.topic-divider {
+  max-width: var(--container);
+  margin: 0 auto;
+  border: none;
+  border-top: 1px solid rgba(247, 239, 224, 0.15);
+}
+
+.topic-section {
+  padding: 56px clamp(20px, 4vw, 48px);
+}
+
+.topic-section__eyebrow {
+  display: block;
+  padding-bottom: 16px;
+  margin-bottom: 30px;
+  border-bottom: 1px solid rgba(247, 239, 224, 0.15);
+}
+
+.topic-featured {
+  max-width: 640px;
+}
+
+.topic-featured h2 {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  margin-bottom: 14px;
+}
+
+.topic-featured > p {
+  font-size: 1.05rem;
+  max-width: 560px;
+}
+
+.topic-questions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.topic-questions li {
+  position: relative;
+  padding-left: 24px;
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  line-height: 1.5;
+}
+
+.topic-questions li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.showtime-when {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  color: var(--gold-bright);
+  margin-bottom: 24px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8), 0 0 24px rgba(0, 0, 0, 0.5);
+}
+
+.panel {
+  background: rgba(247, 239, 224, 0.05);
+  border: 1px solid rgba(247, 239, 224, 0.2);
+  border-radius: var(--radius-lg);
+  padding: 30px;
+}
+
+.panel h3,
+.panel p,
+.panel strong {
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+/* ---------- Theme: warm cream (topic detail page) ----------
+   No photo behind this page, so it flips to dark ink on warm cream
+   instead of light text + shadow on a photo. Panels and the button get
+   distinct-but-related tan/gold tones so they still read as separate
+   surfaces against the cream page. */
+
+body.theme-cream {
+  background: var(--parchment);
+  color: #5a4632;
+}
+
+body.theme-cream .nav {
+  background: rgba(58, 42, 29, 0.05);
+  border-bottom-color: rgba(58, 42, 29, 0.15);
+}
+
+body.theme-cream .nav__brand,
+body.theme-cream .eyebrow,
+body.theme-cream .showtime-when {
+  color: var(--gold-dim);
+  text-shadow: none;
+}
+
+body.theme-cream .nav__brand span,
+body.theme-cream .nav__links a,
+body.theme-cream .back-link {
+  color: #6b5334;
+  text-shadow: none;
+}
+
+body.theme-cream .nav__links a:hover,
+body.theme-cream .nav__links a.is-active,
+body.theme-cream .back-link:hover {
+  color: var(--gold-dim);
+}
+
+body.theme-cream h1,
+body.theme-cream h2,
+body.theme-cream h3,
+body.theme-cream h4 {
+  color: #2c1e12;
+  text-shadow: none;
+}
+
+body.theme-cream .hero__tagline,
+body.theme-cream .topic-intro__subtitle {
+  color: #6b5334;
+  text-shadow: none;
+}
+
+body.theme-cream .topic-divider,
+body.theme-cream .topic-section__eyebrow {
+  border-color: rgba(58, 42, 29, 0.15);
+}
+
+/* Panel: a warmer, slightly deeper cream than the page — visibly its own
+   surface without breaking from the palette. */
+body.theme-cream .panel {
+  background: #ecdcb5;
+  border-color: rgba(58, 42, 29, 0.12);
+}
+
+body.theme-cream p,
+body.theme-cream strong {
+  color: #5a4632;
+}
+
+body.theme-cream .panel h3,
+body.theme-cream .panel p,
+body.theme-cream .panel strong {
+  text-shadow: none;
+}
+
+body.theme-cream .rsvp__note {
+  color: #8a7150;
+}
+
+body.theme-cream .rsvp input[type="tel"],
+body.theme-cream .rsvp input[type="text"] {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(58, 42, 29, 0.25);
+  color: #2c1e12;
+}
+
+body.theme-cream .footer__row {
+  color: #8a7150;
+}
+
+body.theme-cream .footer__row a {
+  color: #6b5334;
+}
+
+/* ---------- RSVP form ---------- */
+
+.rsvp {
+  margin-top: 40px;
+  max-width: 460px;
+}
+
+.rsvp__row {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.rsvp input[type="tel"],
+.rsvp input[type="text"] {
+  flex: 1;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(247, 239, 224, 0.2);
+  background: rgba(20, 16, 12, 0.6);
+  color: var(--cream);
+  font-family: var(--font-body);
+  font-size: 1rem;
+}
+
+.rsvp input[type="tel"]:focus,
+.rsvp input[type="text"]:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(207, 155, 61, 0.18);
+}
+
+.rsvp__note {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--parchment-dim);
+  opacity: 0.75;
+}
+
+/* Netlify Forms spam honeypot — present for bots to fill in, invisible
+   and unreachable by keyboard/screen readers for real visitors. */
+.rsvp__honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.rsvp__error {
+  color: #ff9aa2;
+  font-size: 0.82rem;
+  margin-top: 8px;
+  display: none;
+}
+
+.rsvp.has-error .rsvp__error {
+  display: block;
+}
+
+.rsvp__confirm {
+  display: none;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  background: rgba(207, 155, 61, 0.1);
+  border: 1px solid rgba(207, 155, 61, 0.3);
+}
+
+.rsvp.is-confirmed .rsvp__form {
+  display: none;
+}
+
+.rsvp.is-confirmed .rsvp__confirm {
+  display: flex;
+}
+
+.rsvp__confirm-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+/* ---------- Footer ---------- */
+
+.footer {
+  border-top: 1px solid rgba(207, 155, 61, 0.15);
+  padding: 40px 0;
+  margin-top: 60px;
+}
+
+.footer__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.82rem;
+  color: var(--parchment-dim);
+}
+
+/* ---------- Utility ---------- */
+
+.eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+  margin-bottom: 10px;
+  display: block;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--cream);
+  margin-bottom: 24px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+.back-link:hover {
+  color: var(--gold-bright);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 860px) {
+  .nav__links {
+    position: fixed;
+    top: 68px;
+    left: 0;
+    right: 0;
+    background: var(--stage-dark);
+    flex-direction: column;
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(207, 155, 61, 0.18);
+    transform: translateY(-130%);
+    transition: transform 0.25s ease;
+    z-index: 90;
+  }
+
+  .nav__links.is-open {
+    transform: translateY(0);
+  }
+
+  .nav__toggle {
+    display: block;
+  }
+
+  .grid--topics {
+    grid-template-columns: 1fr;
+  }
+
+  .rsvp__row {
+    flex-direction: column;
+  }
+}

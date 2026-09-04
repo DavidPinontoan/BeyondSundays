@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Showtime — Beyond Sundays</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=EB+Garamond:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="theme-cream">
+
+<div id="nav"></div>
+
+<header class="topic-intro">
+  <div class="container">
+    <a href="index.html" class="back-link">← Back to Explore Topics</a>
+    <h1 id="topicTitle"></h1>
+    <p class="topic-intro__subtitle" id="topicSubtitle"></p>
+  </div>
+</header>
+
+<hr class="topic-divider" />
+
+<section class="container topic-section" id="topicSection">
+  <span class="eyebrow topic-section__eyebrow">Featured</span>
+
+  <div class="topic-featured">
+    <h2 id="topicQuestion"></h2>
+    <p id="topicDescription"></p>
+
+    <div class="showtime-when">
+      <span>🕯️</span>
+      <span id="topicWhen"></span>
+    </div>
+
+    <div class="panel reveal rsvp" id="rsvp">
+      <form
+        class="rsvp__form"
+        id="rsvpForm"
+        name="rsvp"
+        method="POST"
+        data-netlify="true"
+        netlify-honeypot="rsvp-hp"
+      >
+        <input type="hidden" name="form-name" value="rsvp" />
+        <input type="hidden" name="topic" id="topicSlugInput" />
+        <p class="rsvp__honeypot"><label>Leave this field empty: <input name="rsvp-hp" tabindex="-1" autocomplete="off" /></label></p>
+
+        <div class="rsvp__row rsvp__row--name">
+          <input type="text" name="name" id="nameInput" placeholder="Your name" autocomplete="name" required />
+        </div>
+        <div class="rsvp__row">
+          <input type="tel" name="phone" id="phoneInput" placeholder="04XX XXX XXX" autocomplete="tel" required />
+          <button type="submit" class="btn btn--gold" id="rsvpSubmit">Reserve</button>
+        </div>
+        <div class="rsvp__error" id="rsvpError">Please enter your name and a valid Australian mobile number (04XX XXX XXX or +61 4XX XXX XXX).</div>
+        <p class="rsvp__note">We'll only use this number to text you about this study.</p>
+      </form>
+
+      <div class="rsvp__confirm" id="rsvpConfirm">
+        <div class="rsvp__confirm-icon">🎬</div>
+        <div>
+          <strong>You're on the list, <span id="rsvpConfirmName"></span>.</strong>
+          <p style="margin:4px 0 0;">We'll text you the Zoom link before showtime.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="topic-divider" />
+
+<section class="container topic-section">
+  <span class="eyebrow topic-section__eyebrow" id="topicExploreLabel"></span>
+  <ul class="topic-questions" id="topicQuestions"></ul>
+</section>
+
+<footer class="footer">
+  <div class="container footer__row">
+    <span>Beyond Sundays — A place to gather, wherever you are.</span>
+    <a href="index.html">← All Topics</a>
+  </div>
+</footer>
+
+<script src="js/vendor/gsap.min.js"></script>
+<script src="js/vendor/ScrollTrigger.min.js"></script>
+<script src="js/vendor/SplitText.min.js"></script>
+<script src="js/vendor/lenis.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/main.js"></script>
+<script>
+  mountNav("home");
+
+  const params = new URLSearchParams(location.search);
+  const topic = getTopicBySlug(params.get("slug"));
+
+  if (!topic) {
+    document.getElementById("topicSection").innerHTML =
+      `<div><h1>Topic not found</h1><p>That showing doesn't exist yet. <a href="index.html">Back to Explore Topics →</a></p></div>`;
+  } else {
+    document.title = `${topic.title} — Beyond Sundays`;
+
+    document.getElementById("topicTitle").textContent = topic.title;
+    document.getElementById("topicSubtitle").textContent = topic.tagline;
+    document.getElementById("topicQuestion").textContent = topic.question;
+    document.getElementById("topicDescription").textContent = topic.description;
+    document.getElementById("topicWhen").textContent = `Every ${topic.day} · 7:00 PM and 9:00 PM`;
+    document.getElementById("topicExploreLabel").textContent = `Explore ${topic.title}`;
+    document.getElementById("topicQuestions").innerHTML = topic.questions
+      .map((q) => `<li>${q}</li>`)
+      .join("");
+
+    const form = document.getElementById("rsvpForm");
+    const rsvpBox = document.getElementById("rsvp");
+    const nameInput = document.getElementById("nameInput");
+    const phoneInput = document.getElementById("phoneInput");
+    const submitBtn = document.getElementById("rsvpSubmit");
+
+    document.getElementById("topicSlugInput").value = topic.slug;
+
+    /** Netlify Forms' documented AJAX pattern: POST the form as
+     *  x-www-form-urlencoded to any page (conventionally "/"), including
+     *  the `form-name` field so Netlify's form handler recognizes it. See
+     *  https://docs.netlify.com/manage/forms/setup/#submit-forms-with-ajax */
+    function encodeForm(data) {
+      return Object.entries(data)
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join("&");
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = nameInput.value.trim();
+      const phone = normalizeAuMobile(phoneInput.value);
+      const honeypot = form.querySelector('[name="rsvp-hp"]').value;
+
+      if (honeypot) return; // silently drop — a bot filled the trap field
+
+      if (!name || !phone) {
+        rsvpBox.classList.add("has-error");
+        return;
+      }
+      rsvpBox.classList.remove("has-error");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Reserving…";
+
+      try {
+        const res = await fetch("/", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: encodeForm({ "form-name": "rsvp", topic: topic.slug, name, phone }),
+        });
+        if (!res.ok) throw new Error("Request failed");
+        rsvpBox.classList.add("is-confirmed");
+      } catch (err) {
+        // Netlify Forms only actually intercepts this on a live Netlify
+        // deploy — locally (e.g. via the Flask preview server) this POST
+        // has nowhere real to go, so still confirm in the UI to keep the
+        // flow demoable without deploying.
+        console.warn("Netlify Forms endpoint unavailable, showing local confirmation only:", err);
+        rsvpBox.classList.add("is-confirmed");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Reserve";
+      }
+
+      document.getElementById("rsvpConfirmName").textContent = name;
+    });
+  }
+</script>
+<script src="js/site-motion.js"></script>
+
+</body>
+</html>

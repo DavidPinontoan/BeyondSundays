@@ -1,0 +1,9 @@
+{
+  "_comment": "Server-side mirror of js/data.js's day/title fields, plus real Zoom links — used by send-reminders.mjs to know which topic is live and what link to text out. Keep the slugs and days in sync with js/data.js if you change the lineup.",
+  "value-of-the-bible": { "title": "Value of the Bible", "day": "Monday", "zoomLink": "https://zoom.us/j/PLACEHOLDER1" },
+  "wise-investment": { "title": "Wise Investment", "day": "Tuesday", "zoomLink": "https://zoom.us/j/PLACEHOLDER2" },
+  "good-and-evil": { "title": "Good and Evil", "day": "Wednesday", "zoomLink": "https://zoom.us/j/PLACEHOLDER3" },
+  "old-covenant": { "title": "Old Covenant", "day": "Thursday", "zoomLink": "https://zoom.us/j/PLACEHOLDER4" },
+  "new-covenant": { "title": "New Covenant", "day": "Friday", "zoomLink": "https://zoom.us/j/PLACEHOLDER5" },
+  "what-kind-of-era": { "title": "What Kind of Era Are We In?", "day": "Saturday", "zoomLink": "https://zoom.us/j/PLACEHOLDER6" }
+}

@@ -1,0 +1,7 @@
+server/.env
+server/data/reservations.json
+server/venv/
+__pycache__/
+*.pyc
+.DS_Store
+node_modules/

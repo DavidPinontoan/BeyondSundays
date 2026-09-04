@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Beyond Sundays — Online Bible Study</title>
+<meta name="description" content="An online Bible study, browsed like a cinema. Reserve your spot and get the Zoom link by text." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=EB+Garamond:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="site-bg" id="siteBg"></div>
+
+<div id="nav"></div>
+
+<header class="hero" id="hero">
+  <div class="hero__glow"></div>
+  <div class="hero__content">
+    <h1 id="heroTitle">
+      <span class="hero__welcome">Welcome to</span>
+      <span class="hero__brand">Beyond Sundays</span>
+    </h1>
+    <p class="hero__tagline">Where does Faith take You after Sunday?</p>
+    <div class="hero__cta">
+      <a href="#explore-topics" class="btn btn--gold">Browse Topics</a>
+    </div>
+  </div>
+</header>
+
+<main class="container stage-panel" id="stagePanel">
+
+  <section class="section" id="explore-topics">
+    <div class="section__head">
+      <h2>Explore the Topics</h2>
+      <p>Six studies, one for each day.</p>
+    </div>
+    <div class="grid grid--topics" id="topicsGrid"></div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="container footer__row">
+    <span>Beyond Sundays — A place to gather, wherever you are.</span>
+  </div>
+</footer>
+
+<script src="js/vendor/gsap.min.js"></script>
+<script src="js/vendor/ScrollTrigger.min.js"></script>
+<script src="js/vendor/SplitText.min.js"></script>
+<script src="js/vendor/lenis.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/backgrounds-data.js"></script>
+<script src="js/main.js"></script>
+<script src="js/embers.js"></script>
+<script>
+  mountNav("home");
+
+  document.getElementById("topicsGrid").innerHTML = TOPICS.map(posterCardHTML).join("");
+
+  renderSiteBackgrounds();
+</script>
+<script src="js/site-motion.js"></script>
+
+</body>
+</html>
