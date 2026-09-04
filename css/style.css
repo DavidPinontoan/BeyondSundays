@@ -797,6 +797,20 @@ body.theme-cream .rsvp input[type="text"] {
   color: #2c1e12;
 }
 
+body.theme-cream .rsvp__sessions-label,
+body.theme-cream .rsvp__session-option {
+  color: #6b5334;
+}
+
+body.theme-cream .rsvp__calendar-link {
+  color: #6b5334;
+  border-color: rgba(58, 42, 29, 0.25);
+}
+
+body.theme-cream .rsvp__calendar-link:hover {
+  border-color: #6b5334;
+}
+
 body.theme-cream .footer__row {
   color: #8a7150;
 }
@@ -843,6 +857,50 @@ body.theme-cream .footer__row a {
   font-size: 0.78rem;
   color: var(--parchment-dim);
   opacity: 0.75;
+}
+
+.rsvp__sessions {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.rsvp__sessions-label {
+  font-size: 0.82rem;
+  color: var(--parchment-dim);
+}
+
+.rsvp__session-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  color: var(--parchment-dim);
+  cursor: pointer;
+}
+
+.rsvp__session-option input {
+  accent-color: var(--gold);
+}
+
+.rsvp__calendar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 12px;
+}
+
+.rsvp__calendar-link {
+  font-size: 0.78rem;
+  color: var(--parchment-dim);
+  border: 1px solid rgba(247, 239, 224, 0.25);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+
+.rsvp__calendar-link:hover {
+  border-color: var(--gold);
+  color: var(--gold-bright);
 }
 
 /* Netlify Forms spam honeypot — present for bots to fill in, invisible

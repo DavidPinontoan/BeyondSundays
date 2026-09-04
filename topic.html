@@ -48,6 +48,15 @@
         <input type="hidden" name="topic" id="topicSlugInput" />
         <p class="rsvp__honeypot"><label>Leave this field empty: <input name="rsvp-hp" tabindex="-1" autocomplete="off" /></label></p>
 
+        <div class="rsvp__row rsvp__sessions" id="rsvpSessions">
+          <span class="rsvp__sessions-label">Which showing?</span>
+          <label class="rsvp__session-option">
+            <input type="radio" name="session" value="7pm" /> 7:00 PM
+          </label>
+          <label class="rsvp__session-option">
+            <input type="radio" name="session" value="9pm" /> 9:00 PM
+          </label>
+        </div>
         <div class="rsvp__row rsvp__row--name">
           <input type="text" name="name" id="nameInput" placeholder="Your name" autocomplete="name" required />
         </div>
@@ -55,8 +64,8 @@
           <input type="tel" name="phone" id="phoneInput" placeholder="04XX XXX XXX" autocomplete="tel" required />
           <button type="submit" class="btn btn--gold" id="rsvpSubmit">Reserve</button>
         </div>
-        <div class="rsvp__error" id="rsvpError">Please enter your name and a valid Australian mobile number (04XX XXX XXX or +61 4XX XXX XXX).</div>
-        <p class="rsvp__note">We'll only use this number to text you about this study.</p>
+        <div class="rsvp__error" id="rsvpError">Please pick a showing, and enter your name and a valid Australian mobile number (04XX XXX XXX or +61 4XX XXX XXX).</div>
+        <p class="rsvp__note">We'll only use this number to text you about this study. An hour before your showing, we'll text asking you to confirm you're still coming.</p>
       </form>
 
       <div class="rsvp__confirm" id="rsvpConfirm">
@@ -64,6 +73,10 @@
         <div>
           <strong>You're on the list, <span id="rsvpConfirmName"></span>.</strong>
           <p style="margin:4px 0 0;">We'll text you the Zoom link before showtime.</p>
+          <div class="rsvp__calendar" id="rsvpCalendar">
+            <a class="rsvp__calendar-link" id="rsvpGoogleCal" target="_blank" rel="noopener">+ Google Calendar</a>
+            <a class="rsvp__calendar-link" id="rsvpIcsDownload" download="beyond-sundays.ics">+ Apple / Outlook (.ics)</a>
+          </div>
         </div>
       </div>
     </div>
@@ -107,6 +120,9 @@
     document.getElementById("topicQuestion").textContent = topic.question;
     document.getElementById("topicDescription").textContent = topic.description;
     document.getElementById("topicWhen").textContent = `Every ${topic.day} · 7:00 PM and 9:00 PM`;
+    document.getElementById("rsvpSessions").querySelectorAll('input[name="session"]').forEach((el) => {
+      el.nextSibling.textContent = ` ${topic.day} ${el.value === "7pm" ? "7:00 PM" : "9:00 PM"}`;
+    });
     document.getElementById("topicExploreLabel").textContent = `Explore ${topic.title}`;
     document.getElementById("topicQuestions").innerHTML = topic.questions
       .map((q) => `<li>${q}</li>`)
@@ -130,15 +146,79 @@
         .join("&");
     }
 
+    /** Next Sydney-local occurrence of `dayName` at `hour` (24h), as a real
+     *  UTC instant — used for both the calendar links and, indirectly, to
+     *  keep this in step with the reminder function's own Sydney-time math. */
+    function nextSessionUTC(dayName, hour) {
+      const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const targetDow = DAYS.indexOf(dayName);
+
+      const nowParts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Australia/Sydney",
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", hour12: false,
+      }).formatToParts(new Date());
+      const get = (t) => nowParts.find((p) => p.type === t).value;
+      const todayY = Number(get("year")), todayM = Number(get("month")), todayD = Number(get("day"));
+      const nowHour = Number(get("hour")), nowMinute = Number(get("minute"));
+
+      const todayNoon = new Date(Date.UTC(todayY, todayM - 1, todayD, 12, 0, 0));
+      let daysAhead = (targetDow - todayNoon.getUTCDay() + 7) % 7;
+      if (daysAhead === 0 && (nowHour > hour || (nowHour === hour && nowMinute >= 0))) daysAhead = 7;
+
+      const candidate = new Date(Date.UTC(todayY, todayM - 1, todayD + daysAhead, hour, 0, 0));
+      const offsetParts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Australia/Sydney", timeZoneName: "shortOffset",
+      }).formatToParts(candidate);
+      const offsetStr = offsetParts.find((p) => p.type === "timeZoneName").value; // "GMT+11"
+      const m = offsetStr.match(/GMT([+-]\d+)(?::(\d+))?/);
+      const offsetMinutes = Number(m[1]) * 60 + (m[2] ? Math.sign(Number(m[1])) * Number(m[2]) : 0);
+
+      return new Date(candidate.getTime() - offsetMinutes * 60000);
+    }
+
+    function icsStamp(date) {
+      return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    }
+
+    function fillCalendarLinks(session) {
+      const hour = session === "7pm" ? 19 : 21;
+      const start = nextSessionUTC(topic.day, hour);
+      const end = new Date(start.getTime() + 60 * 60000);
+      const title = `Beyond Sundays — ${topic.title}`;
+      const details = "We'll text the Zoom link before it starts.";
+
+      const gcal = new URL("https://calendar.google.com/calendar/render");
+      gcal.searchParams.set("action", "TEMPLATE");
+      gcal.searchParams.set("text", title);
+      gcal.searchParams.set("dates", `${icsStamp(start)}/${icsStamp(end)}`);
+      gcal.searchParams.set("details", details);
+      document.getElementById("rsvpGoogleCal").href = gcal.toString();
+
+      const ics = [
+        "BEGIN:VCALENDAR", "VERSION:2.0", "BEGIN:VEVENT",
+        `UID:${topic.slug}-${session}-${icsStamp(start)}@beyondsundays`,
+        `DTSTAMP:${icsStamp(new Date())}`,
+        `DTSTART:${icsStamp(start)}`,
+        `DTEND:${icsStamp(end)}`,
+        `SUMMARY:${title}`,
+        `DESCRIPTION:${details}`,
+        "END:VEVENT", "END:VCALENDAR",
+      ].join("\r\n");
+      document.getElementById("rsvpIcsDownload").href =
+        "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
+    }
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const name = nameInput.value.trim();
       const phone = normalizeAuMobile(phoneInput.value);
+      const session = form.querySelector('input[name="session"]:checked')?.value;
       const honeypot = form.querySelector('[name="rsvp-hp"]').value;
 
       if (honeypot) return; // silently drop — a bot filled the trap field
 
-      if (!name || !phone) {
+      if (!name || !phone || !session) {
         rsvpBox.classList.add("has-error");
         return;
       }
@@ -146,27 +226,42 @@
       submitBtn.disabled = true;
       submitBtn.textContent = "Reserving…";
 
+      let submitted = false;
       try {
         const res = await fetch("/", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: encodeForm({ "form-name": "rsvp", topic: topic.slug, name, phone }),
+          body: encodeForm({ "form-name": "rsvp", topic: topic.slug, name, phone, session }),
         });
         if (!res.ok) throw new Error("Request failed");
-        rsvpBox.classList.add("is-confirmed");
+        submitted = true;
       } catch (err) {
         // Netlify Forms only actually intercepts this on a live Netlify
         // deploy — locally (e.g. via the Flask preview server) this POST
         // has nowhere real to go, so still confirm in the UI to keep the
         // flow demoable without deploying.
         console.warn("Netlify Forms endpoint unavailable, showing local confirmation only:", err);
-        rsvpBox.classList.add("is-confirmed");
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = "Reserve";
       }
 
+      rsvpBox.classList.add("is-confirmed");
       document.getElementById("rsvpConfirmName").textContent = name;
+      fillCalendarLinks(session);
+
+      // Best-effort instant "you're confirmed" text — only fired once the
+      // Netlify Forms submission itself actually succeeded. Failure here
+      // (e.g. local preview, or the function being briefly unavailable)
+      // shouldn't block the on-page confirmation, since the RSVP is
+      // already saved either way.
+      if (submitted) {
+        fetch("/.netlify/functions/send-confirmation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, phone, topicSlug: topic.slug, session }),
+        }).catch((err) => console.warn("Instant confirmation text failed to send:", err));
+      }
     });
   }
 </script>

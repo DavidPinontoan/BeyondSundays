@@ -1,0 +1,58 @@
+/**
+ * Synchronous Netlify Function — called directly by topic.html's RSVP form
+ * right after a Netlify Forms submission succeeds. Texts the person an
+ * immediate "you're confirmed" message so they get feedback beyond the
+ * on-page UI (which disappears if they navigate away).
+ *
+ * NOT TESTED — no Node.js runtime in the environment this was built in.
+ * Check this function's logs in the Netlify dashboard after your first
+ * real RSVP.
+ *
+ * Requires the same env vars as send-reminders.mjs: TWILIO_ACCOUNT_SID,
+ * TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER. Without them, sends are just
+ * logged.
+ */
+
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import twilio from "twilio";
+
+const TOPICS = JSON.parse(
+  readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
+);
+
+export default async (req) => {
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
+
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return new Response("Invalid JSON", { status: 400 });
+  }
+
+  const { name, phone, topicSlug, session } = body;
+  const topic = TOPICS[topicSlug];
+  if (!name || !phone || !topic || (session !== "7pm" && session !== "9pm")) {
+    return new Response("Missing or invalid fields", { status: 400 });
+  }
+
+  const sessionLabel = session === "7pm" ? "7:00 PM" : "9:00 PM";
+  const message = `Hey ${name}! You're confirmed for "${topic.title}" this ${topic.day} at ${sessionLabel} — so glad you're joining us 🎬 We'll text the Zoom link before it starts, and check in with you an hour beforehand to confirm you're still coming.`;
+
+  const client =
+    process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
+      ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+      : null;
+
+  const to = phone.replace(/\s/g, "");
+  if (client && process.env.TWILIO_FROM_NUMBER) {
+    await client.messages.create({ body: message, from: process.env.TWILIO_FROM_NUMBER, to });
+  } else {
+    console.log(`[SMS SCAFFOLD] Would text ${to}: ${message}`);
+  }
+
+  return new Response("OK", { status: 200 });
+};

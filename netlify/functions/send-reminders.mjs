@@ -1,8 +1,14 @@
 /**
- * Scheduled Netlify Function — checks every 15 minutes whether it's
- * showtime for that day's topic (7:00 PM in TIMEZONE below, matching the
- * "Every {day} · 7:00 PM and 9:00 PM" line on each topic page) and, if so,
- * texts the Zoom link to everyone who RSVP'd for it via Netlify Forms.
+ * Scheduled Netlify Function — runs every 15 minutes. For whichever topic
+ * airs today (matched by weekday against topics-schedule.json), and for
+ * each of its two showings (7:00 PM and 9:00 PM Sydney time):
+ *
+ *   - One hour before that showing: texts everyone who RSVP'd for it
+ *     asking "are you still coming? reply Y or N" (see sms-reply.mjs for
+ *     the reply handler) and records each as a pending confirmation.
+ *   - At showtime: texts the Zoom link to everyone who RSVP'd for it (as
+ *     before), then tallies how the hour-before confirmations came in
+ *     (yes / no / no reply) and texts that tally to ORGANIZER_PHONE.
  *
  * NOT TESTED — written to Netlify's and Twilio's documented APIs, but
  * there's no Node.js runtime in the environment this was built in, so
@@ -10,20 +16,21 @@
  * Netlify dashboard after your first deploy and after the first showtime
  * rolls around; ping back with the exact error if something's off.
  *
- * Required environment variables (set in Netlify's dashboard under
- * Site configuration → Environment variables):
+ * Required environment variables (Site configuration → Environment
+ * variables):
  *
- *   NETLIFY_SITE_ID       Your site's API ID (Site configuration → General
- *                         → Site details → Site ID).
- *   NETLIFY_ACCESS_TOKEN  A Personal Access Token (User settings →
- *                         Applications → New access token) — needed to
- *                         read Netlify Forms submissions via their API.
+ *   NETLIFY_SITE_ID       Site configuration → General → Site details → Site ID.
+ *   NETLIFY_ACCESS_TOKEN  Personal Access Token (User settings → Applications)
+ *                         — needed to read Netlify Forms submissions via the API.
  *   TWILIO_ACCOUNT_SID
  *   TWILIO_AUTH_TOKEN
  *   TWILIO_FROM_NUMBER
+ *   ORGANIZER_PHONE       Your own mobile (+61 format) — receives the
+ *                         showtime confirmation tally. Without it, the
+ *                         tally is just logged instead of texted.
  *
- * Without the Twilio vars set, sends are just logged (visible in the
- * function's logs), same placeholder behavior as server/sms.py had.
+ * Without the Twilio vars set, all sends are just logged (visible in the
+ * function's logs).
  */
 
 import { readFileSync } from "node:fs";
@@ -35,75 +42,135 @@ const TOPICS = JSON.parse(
   readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
 );
 
-// Change to your actual timezone if this isn't it.
 const TIMEZONE = "Australia/Sydney";
-const START_HOUR = 19; // 7:00 PM
-const WINDOW_MINUTES = 15; // fire once within the first 15 min after start
+const WINDOW_MINUTES = 15; // act once within the first 15 min after the top of the hour
+const SESSIONS = [
+  { key: "7pm", hour: 19, label: "7:00 PM" },
+  { key: "9pm", hour: 21, label: "9:00 PM" },
+];
+
+function twilioClient() {
+  return process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
+    ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+    : null;
+}
+
+async function sendSms(client, to, body) {
+  if (client && process.env.TWILIO_FROM_NUMBER) {
+    await client.messages.create({ body, from: process.env.TWILIO_FROM_NUMBER, to });
+  } else {
+    console.log(`[SMS SCAFFOLD] Would text ${to}: ${body}`);
+  }
+}
 
 export default async () => {
   const now = new Date();
-  const parts = new Intl.DateTimeFormat("en-AU", {
-    timeZone: TIMEZONE,
-    weekday: "long",
-    hour: "numeric",
-    minute: "numeric",
-    hour12: false,
-  }).formatToParts(now);
+  const { weekday, hour, minute } = sydneyParts(now);
 
-  const get = (type) => parts.find((p) => p.type === type)?.value;
-  const weekday = get("weekday");
-  const hour = Number(get("hour"));
-  const minute = Number(get("minute"));
-
-  if (hour !== START_HOUR || minute >= WINDOW_MINUTES) {
-    return new Response("Not showtime.", { status: 200 });
+  if (minute >= WINDOW_MINUTES) {
+    return new Response("Not in a trigger window.", { status: 200 });
   }
 
   const slug = Object.keys(TOPICS).find((s) => TOPICS[s].day === weekday);
   if (!slug) {
     return new Response(`No topic scheduled for ${weekday}.`, { status: 200 });
   }
-
   const topic = TOPICS[slug];
+  const weekKey = isoWeekKey(now);
 
-  // Dedup so a function that fires more than once inside the 15-minute
-  // window doesn't text everyone twice.
-  const dedupStore = getStore("reminder-dedup");
-  const dedupKey = `${slug}-${isoWeekKey(now)}`;
-  const alreadySent = (await dedupStore.get(dedupKey, { type: "json" })) || [];
-
-  const submissions = await fetchRsvpSubmissions(slug);
-  const toSend = submissions.filter((s) => !alreadySent.includes(s.phone));
-
-  if (toSend.length === 0) {
-    return new Response(`No new reservations for ${topic.title}.`, { status: 200 });
-  }
-
-  const client =
-    process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
-      ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-      : null;
-
-  const sentTo = [];
-  for (const { name, phone } of toSend) {
-    const body = `Hi ${name}, Beyond Sundays: "${topic.title}" is starting soon. Join here: ${topic.zoomLink}`;
-    const to = phone.replace(/\s/g, ""); // Twilio wants E.164 with no spaces
-
-    if (client && process.env.TWILIO_FROM_NUMBER) {
-      await client.messages.create({ body, from: process.env.TWILIO_FROM_NUMBER, to });
-    } else {
-      console.log(`[SMS SCAFFOLD] Would text ${to}: ${body}`);
+  const results = [];
+  for (const session of SESSIONS) {
+    if (hour === session.hour - 1) {
+      results.push(await sendConfirmPrompts(slug, topic, session, weekKey));
+    } else if (hour === session.hour) {
+      results.push(await sendZoomLinksAndTally(slug, topic, session, weekKey));
     }
-    sentTo.push(phone);
   }
 
-  await dedupStore.setJSON(dedupKey, [...alreadySent, ...sentTo]);
-
-  return new Response(`Sent ${sentTo.length} reminder(s) for ${topic.title}.`, { status: 200 });
+  if (results.length === 0) {
+    return new Response("Nothing scheduled for this window.", { status: 200 });
+  }
+  return new Response(results.join(" | "), { status: 200 });
 };
 
-/** Pulls this topic's RSVP submissions from the Netlify Forms API. */
-async function fetchRsvpSubmissions(slug) {
+/** One hour before a showing: ask everyone who RSVP'd whether they're still coming. */
+async function sendConfirmPrompts(slug, topic, session, weekKey) {
+  const submissions = await fetchRsvpSubmissions(slug, session.key);
+
+  const dedupStore = getStore("confirm-dedup");
+  const dedupKey = `${slug}-${session.key}-${weekKey}`;
+  const alreadySent = (await dedupStore.get(dedupKey, { type: "json" })) || [];
+  const toPrompt = submissions.filter((s) => !alreadySent.includes(s.phone));
+
+  if (toPrompt.length === 0) {
+    return `No new ${session.label} confirmation prompts for ${topic.title}.`;
+  }
+
+  const client = twilioClient();
+  const pendingStore = getStore("confirm-pending");
+
+  for (const { name, phone } of toPrompt) {
+    const to = phone.replace(/\s/g, "");
+    const body = `Hi ${name}! Quick check — are you still coming to "${topic.title}" tonight at ${session.label}? Reply Y or N.`;
+    await sendSms(client, to, body);
+    await pendingStore.setJSON(to, {
+      slug, session: session.key, sessionLabel: session.label, name, confirmed: null, weekKey,
+    });
+  }
+
+  await dedupStore.setJSON(dedupKey, [...alreadySent, ...toPrompt.map((s) => s.phone)]);
+  return `Sent ${toPrompt.length} confirmation prompt(s) for ${topic.title} ${session.label}.`;
+}
+
+/** At showtime: text the Zoom link, then tally how the confirmations came in. */
+async function sendZoomLinksAndTally(slug, topic, session, weekKey) {
+  const submissions = await fetchRsvpSubmissions(slug, session.key);
+  const client = twilioClient();
+
+  const reminderStore = getStore("reminder-dedup");
+  const reminderKey = `${slug}-${session.key}-${weekKey}`;
+  const alreadyReminded = (await reminderStore.get(reminderKey, { type: "json" })) || [];
+  const toRemind = submissions.filter((s) => !alreadyReminded.includes(s.phone));
+
+  for (const { name, phone } of toRemind) {
+    const to = phone.replace(/\s/g, "");
+    const body = `Hi ${name}, Beyond Sundays: "${topic.title}" is starting soon. Join here: ${topic.zoomLink}`;
+    await sendSms(client, to, body);
+  }
+  if (toRemind.length > 0) {
+    await reminderStore.setJSON(reminderKey, [...alreadyReminded, ...toRemind.map((s) => s.phone)]);
+  }
+
+  const summaryStore = getStore("summary-dedup");
+  const summaryKey = `${slug}-${session.key}-${weekKey}`;
+  const alreadySummarized = await summaryStore.get(summaryKey, { type: "json" });
+
+  let tallyMsg = "";
+  if (!alreadySummarized && submissions.length > 0) {
+    const pendingStore = getStore("confirm-pending");
+    let yes = 0, no = 0, noReply = 0;
+    for (const { phone } of submissions) {
+      const record = await pendingStore.get(phone.replace(/\s/g, ""), { type: "json" });
+      if (record?.confirmed === true) yes++;
+      else if (record?.confirmed === false) no++;
+      else noReply++;
+    }
+
+    const summary = `${topic.title} ${session.label}: ${yes} confirmed, ${no} declined, ${noReply} didn't reply (of ${submissions.length} RSVPs).`;
+    if (process.env.ORGANIZER_PHONE) {
+      await sendSms(client, process.env.ORGANIZER_PHONE.replace(/\s/g, ""), summary);
+    } else {
+      console.log(`[ORGANIZER SUMMARY SCAFFOLD] ${summary}`);
+    }
+    await summaryStore.setJSON(summaryKey, true);
+    tallyMsg = ` Tally: ${summary}`;
+  }
+
+  return `Sent ${toRemind.length} Zoom link(s) for ${topic.title} ${session.label}.${tallyMsg}`;
+}
+
+/** Pulls this topic+session's RSVP submissions from the Netlify Forms API. */
+async function fetchRsvpSubmissions(slug, sessionKey) {
   const siteId = process.env.NETLIFY_SITE_ID;
   const token = process.env.NETLIFY_ACCESS_TOKEN;
   if (!siteId || !token) {
@@ -127,11 +194,19 @@ async function fetchRsvpSubmissions(slug) {
   const submissions = await submissionsRes.json();
 
   return submissions
-    .filter((s) => s.data && s.data.topic === slug && s.data.phone)
+    .filter((s) => s.data && s.data.topic === slug && s.data.session === sessionKey && s.data.phone)
     .map((s) => ({ name: s.data.name, phone: s.data.phone }));
 }
 
-/** "2026-W37"-style key so the dedup store naturally resets each week. */
+function sydneyParts(date) {
+  const parts = new Intl.DateTimeFormat("en-AU", {
+    timeZone: TIMEZONE, weekday: "long", hour: "numeric", minute: "numeric", hour12: false,
+  }).formatToParts(date);
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+  return { weekday: get("weekday"), hour: Number(get("hour")), minute: Number(get("minute")) };
+}
+
+/** "2026-W37"-style key so the dedup stores naturally reset each week. */
 function isoWeekKey(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;

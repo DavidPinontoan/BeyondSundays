@@ -94,19 +94,42 @@ manually invoke `send-reminders.mjs` before deploying. Requires Node.js.
 2. In the Netlify dashboard, go to **Site configuration → Environment
    variables** and set:
    - `NETLIFY_SITE_ID` — Site configuration → General → Site details → Site ID
-   - `NETLIFY_ACCESS_TOKEN` — a Personal Access Token from User settings → Applications → New access token (needed so the function can read Forms submissions via the API)
+   - `NETLIFY_ACCESS_TOKEN` — a Personal Access Token from User settings → Applications → New access token (needed so the functions can read Forms submissions via the API)
    - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` — from your Twilio console
-3. Deploy. Once a real RSVP comes in, it'll appear under the site's
+   - `ORGANIZER_PHONE` — your own mobile, `+61` format — receives the showtime "X confirmed, Y declined, Z no reply" tally text
+3. Point Twilio's inbound-SMS webhook at `sms-reply.mjs` so replies to the
+   "are you still coming? Y or N" text actually get recorded: in the
+   Twilio console, **Phone Numbers → Manage → Active Numbers**, open your
+   number, and under **Messaging Configuration** set "A message comes in"
+   to a webhook, HTTP POST, pointing at
+   `https://<your-site>.netlify.app/.netlify/functions/sms-reply`.
+4. Deploy. Once a real RSVP comes in, it'll appear under the site's
    **Forms → rsvp** tab in the dashboard.
-4. Fill in real Zoom links in `netlify/functions/topics-schedule.json`
+5. Fill in real Zoom links in `netlify/functions/topics-schedule.json`
    (currently placeholders).
 
-`send-reminders.mjs` was written against Netlify's and Twilio's documented
-APIs but **has not been run** — there's no Node.js available in the
-environment it was built in. Check the function's logs in the Netlify
-dashboard (Functions → send-reminders) after your first deploy and after
-the first showtime rolls around, and without the Twilio env vars set it'll
-just log what it would have sent rather than erroring.
+`send-reminders.mjs`, `send-confirmation.mjs`, and `sms-reply.mjs` were all
+written against Netlify's and Twilio's documented APIs but **have not been
+run** — there's no Node.js available in the environment they were built in.
+Check each function's logs in the Netlify dashboard (Functions tab) after
+your first deploy, after a real RSVP, and after the first showtime rolls
+around; without the Twilio env vars set, sends are just logged rather than
+erroring.
+
+### How the SMS flow works
+
+1. **On RSVP** — `send-confirmation.mjs` fires immediately (called directly
+   from `topic.html`, not on a schedule) and texts a warm "you're
+   confirmed for X" message naming the topic and the showing they picked.
+2. **One hour before their showing** — `send-reminders.mjs` (on its
+   15-minute schedule) texts "are you still coming? Reply Y or N" and
+   records the reply via `sms-reply.mjs` against a Netlify Blobs store
+   keyed by phone number.
+3. **At showtime** — `send-reminders.mjs` texts the Zoom link to everyone
+   who RSVP'd for that showing (regardless of how/whether they replied to
+   the Y/N text — that reply is purely a headcount signal for you, not a
+   gate on getting the link), then texts `ORGANIZER_PHONE` one summary
+   line with the confirmed/declined/no-reply tally.
 
 ## Project layout
 
@@ -124,8 +147,10 @@ js/vendor/                  Self-hosted GSAP/ScrollTrigger/SplitText/Lenis (see 
 js/embers.js                Ambient candle-ember canvas overlay
 server/app.py              Flask static-file server for local preview only (see Running it locally)
 netlify.toml               Netlify build config: publish "." and the functions directory
-netlify/functions/send-reminders.mjs        Scheduled function: texts the Zoom link at showtime
-netlify/functions/topics-schedule.json       day/title/Zoom link per topic, read by the function above
+netlify/functions/send-reminders.mjs        Scheduled (15-min) function: 1hr-before Y/N prompts, Zoom links at showtime, organizer tally
+netlify/functions/send-confirmation.mjs      Fired on RSVP submit: instant "you're confirmed" text
+netlify/functions/sms-reply.mjs               Twilio inbound webhook: records Y/N replies
+netlify/functions/topics-schedule.json       day/title/Zoom link per topic, read by the functions above
 ```
 
 ## Still to fill in
@@ -133,5 +158,6 @@ netlify/functions/topics-schedule.json       day/title/Zoom link per topic, read
 - Final topic descriptions (`js/data.js`, `description`/`title` fields — currently placeholders)
 - Real Zoom links (`netlify/functions/topics-schedule.json`, `zoomLink` fields)
 - Hero tagline copy (`index.html`, `.hero__tagline`)
-- Netlify + Twilio environment variables (see Deploying to Netlify above)
+- Netlify + Twilio environment variables, incl. `ORGANIZER_PHONE` (see Deploying to Netlify above)
+- Twilio's inbound-SMS webhook pointed at `sms-reply.mjs` (see Deploying to Netlify above) — without this, Y/N replies are received by Twilio but never recorded
 - Story scene images — set the `image` field on a scene in `js/story-data.js` once you have one; until then it shows the dark placeholder with a soft glow (topic posters are already filled in under `assets/posters/`)
