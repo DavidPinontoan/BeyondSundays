@@ -97,6 +97,7 @@ manually invoke `send-reminders.mjs` before deploying. Requires Node.js.
    - `NETLIFY_ACCESS_TOKEN` — a Personal Access Token from User settings → Applications → New access token (needed so the functions can read Forms submissions via the API)
    - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` — from your Twilio console
    - `ORGANIZER_PHONE` — your own mobile, `+61` format — receives the showtime "X confirmed, Y declined, Z no reply" tally text
+   - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` — see `netlify/functions/lib/telegram.mjs` for how to get these (create a bot via @BotFather, message it once, then read your chat ID off `getUpdates`)
 3. Point Twilio's inbound-SMS webhook at `sms-reply.mjs` so replies to the
    "are you still coming? Y or N" text actually get recorded: in the
    Twilio console, **Phone Numbers → Manage → Active Numbers**, open your
@@ -115,6 +116,16 @@ Check each function's logs in the Netlify dashboard (Functions tab) after
 your first deploy, after a real RSVP, and after the first showtime rolls
 around; without the Twilio env vars set, sends are just logged rather than
 erroring.
+
+**Confirmed by live testing**: a Twilio **trial** account cannot send any
+of these messages at all — trial accounts are restricted to a small set of
+Twilio's own fixed template messages and reject any custom message body
+with `"Invalid template name. Trial accounts can only use predefined SMS
+templates."` Every text in this project (confirmation, Y/N check-in, Zoom
+link, organizer tally) is custom text, so **the Twilio account needs to be
+upgraded to a paid, pay-as-you-go account** (adding a payment method and
+some credit — not a subscription) before any of it can actually send.
+Telegram alerts are unaffected by this and work regardless.
 
 ### How the SMS flow works
 

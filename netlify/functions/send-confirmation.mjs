@@ -1,21 +1,27 @@
 /**
  * Synchronous Netlify Function — called directly by topic.html's RSVP form
- * right after a Netlify Forms submission succeeds. Texts the person an
- * immediate "you're confirmed" message so they get feedback beyond the
- * on-page UI (which disappears if they navigate away).
+ * right after a Netlify Forms submission succeeds. Two things happen from
+ * here, independently (one failing doesn't block the other):
+ *
+ *   1. Texts the person an immediate "you're confirmed" message, so they
+ *      get feedback beyond the on-page UI (which disappears if they
+ *      navigate away).
+ *   2. Alerts the admin via Telegram that a new signup came in.
  *
  * NOT TESTED — no Node.js runtime in the environment this was built in.
  * Check this function's logs in the Netlify dashboard after your first
  * real RSVP.
  *
- * Requires the same env vars as send-reminders.mjs: TWILIO_ACCOUNT_SID,
- * TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER. Without them, sends are just
- * logged.
+ * Requires the same Twilio env vars as send-reminders.mjs
+ * (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER) plus
+ * TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (see lib/telegram.mjs for setup).
+ * Without them, sends are just logged.
  */
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import twilio from "twilio";
+import { sendTelegramAlert } from "./lib/telegram.mjs";
 
 const TOPICS = JSON.parse(
   readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
@@ -48,10 +54,20 @@ export default async (req) => {
       : null;
 
   const to = phone.replace(/\s/g, "");
-  if (client && process.env.TWILIO_FROM_NUMBER) {
-    await client.messages.create({ body: message, from: process.env.TWILIO_FROM_NUMBER, to });
-  } else {
-    console.log(`[SMS SCAFFOLD] Would text ${to}: ${message}`);
+  try {
+    if (client && process.env.TWILIO_FROM_NUMBER) {
+      await client.messages.create({ body: message, from: process.env.TWILIO_FROM_NUMBER, to });
+    } else {
+      console.log(`[SMS SCAFFOLD] Would text ${to}: ${message}`);
+    }
+  } catch (err) {
+    console.error("Confirmation SMS failed:", err);
+  }
+
+  try {
+    await sendTelegramAlert(`🆕 New Signup\n${name}\n${phone}\n\n${topic.title} — ${topic.day} ${sessionLabel}`);
+  } catch (err) {
+    console.error("Telegram alert failed:", err);
   }
 
   return new Response("OK", { status: 200 });
