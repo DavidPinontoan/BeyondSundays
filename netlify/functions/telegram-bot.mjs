@@ -1,6 +1,6 @@
 /**
  * Telegram bot webhook — handles admin commands typed directly into the
- * Telegram chat with the bot (currently /today and /week).
+ * Telegram chat with the bot: /today, /week, /search, /attend, /teacher.
  *
  * One-time setup, after TELEGRAM_BOT_TOKEN is set in Netlify and deployed:
  * visit this URL once in a browser (replace both placeholders):
@@ -23,7 +23,7 @@
 
 import { fetchAllRsvpSubmissions } from "./lib/netlify-forms.mjs";
 import { sendTelegramMessage } from "./lib/telegram.mjs";
-import { searchPeopleByPhone } from "./lib/people-store.mjs";
+import { searchPeopleByPhone, markAttendance, assignTeacher } from "./lib/people-store.mjs";
 
 const TIMEZONE = "Australia/Sydney";
 const WEEK_DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -55,10 +55,21 @@ export default async (req) => {
     await sendTelegramMessage(chatId, await buildWeekReport());
   } else if (text.startsWith("/search")) {
     await sendTelegramMessage(chatId, await buildSearchReport(text.slice("/search".length).trim()));
+  } else if (text.startsWith("/attend")) {
+    await sendTelegramMessage(chatId, await handleAttendCommand(text.slice("/attend".length).trim()));
+  } else if (text.startsWith("/teacher")) {
+    await sendTelegramMessage(chatId, await handleTeacherCommand(text.slice("/teacher".length).trim()));
   } else {
     await sendTelegramMessage(
       chatId,
-      "Commands:\n/today - today's signups\n/week - this week's signups by day\n/search <number> - find someone by mobile number, e.g. /search 0402248977"
+      [
+        "Commands:",
+        "/today - today's signups",
+        "/week - this week's signups by day",
+        "/search <number> - find someone by mobile number, e.g. /search 0402248977",
+        "/attend <number> yes|no - mark whether they attended",
+        "/teacher <number> <teacher name> - assign a teacher",
+      ].join("\n")
     );
   }
 
@@ -151,6 +162,42 @@ async function buildSearchReport(query) {
 
   const header = `Found ${matches.length} match${matches.length === 1 ? "" : "es"}${matches.length > MAX_SEARCH_RESULTS ? ` (showing first ${MAX_SEARCH_RESULTS})` : ""}:`;
   return [header, "", blocks.join("\n\n")].join("\n");
+}
+
+/** Resolves a user-typed number to exactly one stored record, or returns
+ *  a message explaining why it couldn't (used by /attend and /teacher,
+ *  which both need to land on a single unambiguous person). */
+async function resolveOnePerson(numberArg) {
+  const matches = await searchPeopleByPhone(numberArg);
+  if (matches.length === 0) return { error: `No one found matching "${numberArg}".` };
+  if (matches.length > 1) return { error: `Multiple matches for "${numberArg}" — be more specific.` };
+  return { person: matches[0] };
+}
+
+async function handleAttendCommand(args) {
+  const [numberArg, statusArg] = args.split(/\s+/);
+  if (!numberArg || !statusArg) return "Usage: /attend <number> yes|no";
+  const status = statusArg.toLowerCase();
+  if (status !== "yes" && status !== "no") return "Usage: /attend <number> yes|no";
+
+  const { person, error } = await resolveOnePerson(numberArg);
+  if (error) return error;
+
+  const record = await markAttendance(person.phone, status === "yes");
+  return `Marked ${record.name} as ${status === "yes" ? "attended" : "not attended"}.`;
+}
+
+async function handleTeacherCommand(args) {
+  const spaceIdx = args.indexOf(" ");
+  const numberArg = spaceIdx === -1 ? args : args.slice(0, spaceIdx);
+  const teacherName = spaceIdx === -1 ? "" : args.slice(spaceIdx + 1).trim();
+  if (!numberArg || !teacherName) return "Usage: /teacher <number> <teacher name>";
+
+  const { person, error } = await resolveOnePerson(numberArg);
+  if (error) return error;
+
+  const record = await assignTeacher(person.phone, teacherName);
+  return `Assigned ${teacherName} as ${record.name}'s teacher.`;
 }
 
 function inRange(date, startKey, endKey) {

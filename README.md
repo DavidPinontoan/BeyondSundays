@@ -161,6 +161,8 @@ can also message the bot directly:
 - `/search <number>` — find someone by mobile number (local `04XX XXX
   XXX` or international `+61 4XX XXX XXX`, spaces optional); shows join
   date, topic, attendance, and teacher assignment
+- `/attend <number> yes|no` — mark whether they attended
+- `/teacher <number> <teacher name>` — assign a teacher to follow up with them
 
 Only messages from `TELEGRAM_CHAT_ID` get a reply; anyone else who finds
 the bot is silently ignored.
@@ -171,9 +173,8 @@ Netlify Forms submissions are append-only with no update endpoint, so
 this store is what makes `/search`, and later attendance tracking and
 teacher assignment, possible at all. Re-RSVPing updates the same record
 (topic/session) rather than creating a duplicate; `joinedAt` stays fixed
-at their first-ever signup. Still left for a later pass: marking
-attendance, teacher assignment, CSV export, scheduled Saturday-night
-digest, and permission levels (right now there's exactly one admin,
+at their first-ever signup. Still left for a later pass: CSV export, scheduled Saturday-night digest,
+and permission levels (right now there's exactly one admin,
 `TELEGRAM_CHAT_ID`).
 
 ## Project layout
