@@ -158,13 +158,22 @@ can also message the bot directly:
 - `/week` — signups per day, Monday through Saturday (this project's
   "week" ends Saturday night — there's no Sunday topic), plus growth %
   compared with the previous week
+- `/search <name>` — find someone by name; shows join date, topic,
+  attendance, and teacher assignment
 
 Only messages from `TELEGRAM_CHAT_ID` get a reply; anyone else who finds
-the bot is silently ignored. This is a first slice of a much bigger bot
-spec (search, attendance tracking, teacher assignment, CSV export,
-scheduled weekly digests, permission levels) — those need a real
-editable data store instead of read-only Netlify Forms submissions, so
-they're intentionally left for a later pass.
+the bot is silently ignored.
+
+Every RSVP now also writes an editable per-person record to Netlify Blobs
+(`netlify/functions/lib/people-store.mjs`), keyed by phone number —
+Netlify Forms submissions are append-only with no update endpoint, so
+this store is what makes `/search`, and later attendance tracking and
+teacher assignment, possible at all. Re-RSVPing updates the same record
+(topic/session) rather than creating a duplicate; `joinedAt` stays fixed
+at their first-ever signup. Still left for a later pass: marking
+attendance, teacher assignment, CSV export, scheduled Saturday-night
+digest, and permission levels (right now there's exactly one admin,
+`TELEGRAM_CHAT_ID`).
 
 ## Project layout
 

@@ -1,12 +1,16 @@
 /**
  * Synchronous Netlify Function — called directly by topic.html's RSVP form
- * right after a Netlify Forms submission succeeds. Two things happen from
- * here, independently (one failing doesn't block the other):
+ * right after a Netlify Forms submission succeeds. Three things happen
+ * from here, independently (one failing doesn't block the others):
  *
  *   1. Texts the person an immediate "you're confirmed" message, so they
  *      get feedback beyond the on-page UI (which disappears if they
  *      navigate away).
  *   2. Alerts the admin via Telegram that a new signup came in.
+ *   3. Upserts an editable per-person record (lib/people-store.mjs) —
+ *      the foundation for /search, attendance tracking, and teacher
+ *      assignment, none of which Netlify Forms' read-only submissions
+ *      can support on their own.
  *
  * NOT TESTED — no Node.js runtime in the environment this was built in.
  * Check this function's logs in the Netlify dashboard after your first
@@ -22,6 +26,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import twilio from "twilio";
 import { sendAdminAlert } from "./lib/telegram.mjs";
+import { upsertPerson } from "./lib/people-store.mjs";
 
 const TOPICS = JSON.parse(
   readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
@@ -68,6 +73,12 @@ export default async (req) => {
     await sendAdminAlert(`New Signup\n${name}\n${phone}\n\n${topic.title} — ${topic.day} ${sessionLabel}`);
   } catch (err) {
     console.error("Telegram alert failed:", err);
+  }
+
+  try {
+    await upsertPerson({ name, phone, topicSlug, topicTitle: topic.title, session });
+  } catch (err) {
+    console.error("People-store upsert failed:", err);
   }
 
   return new Response("OK", { status: 200 });

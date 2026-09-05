@@ -23,6 +23,7 @@
 
 import { fetchAllRsvpSubmissions } from "./lib/netlify-forms.mjs";
 import { sendTelegramMessage } from "./lib/telegram.mjs";
+import { searchPeopleByName } from "./lib/people-store.mjs";
 
 const TIMEZONE = "Australia/Sydney";
 const WEEK_DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -52,8 +53,13 @@ export default async (req) => {
     await sendTelegramMessage(chatId, await buildTodayReport());
   } else if (text === "/week") {
     await sendTelegramMessage(chatId, await buildWeekReport());
+  } else if (text.startsWith("/search")) {
+    await sendTelegramMessage(chatId, await buildSearchReport(text.slice("/search".length).trim()));
   } else {
-    await sendTelegramMessage(chatId, "Commands:\n/today - today's signups\n/week - this week's signups by day");
+    await sendTelegramMessage(
+      chatId,
+      "Commands:\n/today - today's signups\n/week - this week's signups by day\n/search <name> - find someone by name"
+    );
   }
 
   return new Response("OK", { status: 200 });
@@ -117,6 +123,34 @@ async function buildWeekReport() {
     `Total: ${total} signups`,
     growthLine,
   ].join("\n");
+}
+
+const MAX_SEARCH_RESULTS = 10;
+
+async function buildSearchReport(query) {
+  if (!query) return "Usage: /search <name>";
+
+  const matches = await searchPeopleByName(query);
+  if (matches.length === 0) return `No one found matching "${query}".`;
+
+  const blocks = matches.slice(0, MAX_SEARCH_RESULTS).map((p) => {
+    const joined = new Intl.DateTimeFormat("en-AU", {
+      timeZone: TIMEZONE, day: "numeric", month: "long", year: "numeric",
+    }).format(new Date(p.joinedAt));
+    const attended = p.attended === true ? "Yes" : p.attended === false ? "No" : "Not yet recorded";
+    const teacher = p.teacherAssigned || "Not assigned";
+    return [
+      p.name,
+      p.phone,
+      `Joined: ${joined}`,
+      `Topic: ${p.topicTitle || p.topicSlug}`,
+      `Attended: ${attended}`,
+      `Teacher: ${teacher}`,
+    ].join("\n");
+  });
+
+  const header = `Found ${matches.length} match${matches.length === 1 ? "" : "es"}${matches.length > MAX_SEARCH_RESULTS ? ` (showing first ${MAX_SEARCH_RESULTS})` : ""}:`;
+  return [header, "", blocks.join("\n\n")].join("\n");
 }
 
 function inRange(date, startKey, endKey) {
