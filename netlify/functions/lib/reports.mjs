@@ -25,9 +25,8 @@ export async function buildTodayReport() {
   const weekCount = submissions.filter((s) => inRange(s.createdAt, weekKey, todayKey)).length;
   const monthCount = submissions.filter((s) => inRange(s.createdAt, monthKey, todayKey)).length;
 
-  const dateLabel = new Intl.DateTimeFormat("en-AU", {
-    timeZone: TIMEZONE, weekday: "long", day: "numeric", month: "long", year: "numeric",
-  }).format(todayProxy);
+  const weekdayName = new Intl.DateTimeFormat("en-AU", { timeZone: TIMEZONE, weekday: "long" }).format(todayProxy);
+  const dateLabel = `${customDateCode(todayProxy)} (${weekdayName})`;
 
   return [
     `Beyond Sundays - Today (${dateLabel})`,
@@ -104,6 +103,19 @@ export function sydneyTodayCalendarProxy() {
   }).formatToParts(new Date());
   const get = (t) => Number(parts.find((p) => p.type === t).value);
   return new Date(Date.UTC(get("year"), get("month") - 1, get("day"), 12));
+}
+
+/** Custom compact date code: a "year 43 = 2026" epoch (so it ticks up by
+ *  1 each real year) followed by month and day, e.g. 5 Sept 2026 -> the
+ *  year part is 2026 - 1983 = 43, giving "430905". Used for CSV filenames
+ *  and report date labels instead of the real calendar year. */
+export function customDateCode(date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date);
+  const get = (t) => parts.find((p) => p.type === t).value;
+  const customYear = String(Number(get("year")) - 1983).padStart(2, "0");
+  return `${customYear}${get("month")}${get("day")}`;
 }
 
 /** "2026-W37"-style key so weekly dedup stores naturally reset each week. */

@@ -146,6 +146,14 @@ Telegram alerts are unaffected by this and work regardless.
    the Y/N text — that reply is purely a headcount signal for you, not a
    gate on getting the link), then texts `ORGANIZER_PHONE` one summary
    line with the confirmed/declined/no-reply tally.
+4. **One hour after their showing starts** — `send-reminders.mjs` texts
+   "did you attend? Reply Y or N". This reply is written straight into
+   that person's attendance field in the people-store via `sms-reply.mjs`
+   (same effect as the admin's manual `/attend` bot command), so
+   `/search` and `/export` reflect it automatically. If someone never
+   replied to the "still coming?" text before showtime, that older
+   question is simply dropped — asking it after the fact wouldn't mean
+   anything once the session's already happened.
 
 ### Telegram admin bot
 
@@ -161,12 +169,20 @@ can also message the bot directly:
 - `/search <number>` — find someone by mobile number (local `04XX XXX
   XXX` or international `+61 4XX XXX XXX`, spaces optional); shows join
   date, topic, attendance, and teacher assignment
-- `/attend <number> yes|no` — mark whether they attended
+- `/attend <number> yes|no` — mark whether they attended (this also
+  happens automatically — see "How the SMS flow works" above)
 - `/teacher <number> <teacher name>` — assign a teacher to follow up with them
-- `/export` — sends a CSV file of every signup (name, number, joined date, topic, attended, teacher)
+- `/export week|month|year` — sends a CSV of that period's signups (name,
+  number, signed-up date, topic, attended, teacher); one row per person
+  even if they RSVP'd more than once in the period
 
 Only messages from `TELEGRAM_CHAT_ID` get a reply; anyone else who finds
 the bot is silently ignored.
+
+**Date format**: reports and CSV filenames use a custom compact date
+code instead of the real calendar year — the year is offset so 2026
+reads as "43" (i.e. real year minus 1983), ticking up by 1 each year,
+followed by month and day. 5 September 2026 is `430905`.
 
 Every RSVP now also writes an editable per-person record to Netlify Blobs
 (`netlify/functions/lib/people-store.mjs`), keyed by phone number —

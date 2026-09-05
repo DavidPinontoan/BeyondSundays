@@ -9,6 +9,11 @@
  *   - At showtime: texts the Zoom link to everyone who RSVP'd for it (as
  *     before), then tallies how the hour-before confirmations came in
  *     (yes / no / no reply) and texts that tally to ORGANIZER_PHONE.
+ *   - One hour after that showing starts: texts everyone who RSVP'd
+ *     asking "did you attend? reply Y or N" — the reply (via
+ *     sms-reply.mjs) is written straight to that person's attendance
+ *     field in the people-store, same as the admin's manual /attend
+ *     command would.
  *
  * NOT TESTED — written to Netlify's and Twilio's documented APIs, but
  * there's no Node.js runtime in the environment this was built in, so
@@ -84,6 +89,8 @@ export default async () => {
       results.push(await sendConfirmPrompts(slug, topic, session, weekKey));
     } else if (hour === session.hour) {
       results.push(await sendZoomLinksAndTally(slug, topic, session, weekKey));
+    } else if (hour === session.hour + 1) {
+      results.push(await sendAttendancePrompts(slug, topic, session, weekKey));
     }
   }
 
@@ -114,12 +121,44 @@ async function sendConfirmPrompts(slug, topic, session, weekKey) {
     const body = `Hi ${name}! Quick check — are you still coming to "${topic.title}" tonight at ${session.label}? Reply Y or N.`;
     await sendSms(client, to, body);
     await pendingStore.setJSON(to, {
-      slug, session: session.key, sessionLabel: session.label, name, confirmed: null, weekKey,
+      kind: "pre", slug, session: session.key, sessionLabel: session.label, name, confirmed: null, weekKey,
     });
   }
 
   await dedupStore.setJSON(dedupKey, [...alreadySent, ...toPrompt.map((s) => s.phone)]);
   return `Sent ${toPrompt.length} confirmation prompt(s) for ${topic.title} ${session.label}.`;
+}
+
+/** One hour after a showing starts: ask everyone who RSVP'd whether they
+ *  actually attended. Overwrites any still-unanswered "are you still
+ *  coming?" pending record for the same phone — that question is moot
+ *  once the session has already happened. */
+async function sendAttendancePrompts(slug, topic, session, weekKey) {
+  const submissions = await fetchRsvpSubmissions(slug, session.key);
+
+  const dedupStore = getStore("attend-dedup");
+  const dedupKey = `${slug}-${session.key}-${weekKey}`;
+  const alreadySent = (await dedupStore.get(dedupKey, { type: "json" })) || [];
+  const toPrompt = submissions.filter((s) => !alreadySent.includes(s.phone));
+
+  if (toPrompt.length === 0) {
+    return `No new attendance prompts for ${topic.title} ${session.label}.`;
+  }
+
+  const client = twilioClient();
+  const pendingStore = getStore("confirm-pending");
+
+  for (const { name, phone } of toPrompt) {
+    const to = phone.replace(/\s/g, "");
+    const body = `Hi ${name}! Did you attend "${topic.title}" tonight at ${session.label}? Reply Y or N.`;
+    await sendSms(client, to, body);
+    await pendingStore.setJSON(to, {
+      kind: "post", slug, session: session.key, sessionLabel: session.label, name, confirmed: null, weekKey,
+    });
+  }
+
+  await dedupStore.setJSON(dedupKey, [...alreadySent, ...toPrompt.map((s) => s.phone)]);
+  return `Sent ${toPrompt.length} attendance prompt(s) for ${topic.title} ${session.label}.`;
 }
 
 /** At showtime: text the Zoom link, then tally how the confirmations came in. */

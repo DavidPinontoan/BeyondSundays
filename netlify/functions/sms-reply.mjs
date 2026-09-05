@@ -1,9 +1,12 @@
 /**
- * Twilio inbound-SMS webhook — receives replies to the "are you still
- * coming? reply Y or N" text that send-reminders.mjs sends an hour before
- * each showing, and records the answer against that phone number's
- * pending confirmation (see the `confirm-pending` Blobs store, written by
- * send-reminders.mjs) so the showtime tally can count it.
+ * Twilio inbound-SMS webhook — receives replies to whichever Y/N question
+ * send-reminders.mjs most recently sent that phone number: the "are you
+ * still coming?" prompt an hour before a showing, or the "did you
+ * attend?" prompt an hour after one (see the `confirm-pending` Blobs
+ * store, written by send-reminders.mjs — its `kind` field, "pre" or
+ * "post", says which question is open). A "post" reply is written
+ * straight to that person's attendance field in the people-store, same
+ * as the admin's manual /attend bot command would do.
  *
  * NOT TESTED — no Node.js runtime in the environment this was built in.
  *
@@ -16,6 +19,7 @@
  */
 
 import { getStore } from "@netlify/blobs";
+import { markAttendance } from "./lib/people-store.mjs";
 
 export default async (req) => {
   if (req.method !== "POST") {
@@ -29,21 +33,29 @@ export default async (req) => {
   const pendingStore = getStore("confirm-pending");
   const record = from ? await pendingStore.get(from, { type: "json" }) : null;
 
+  const isYes = /^y(es)?$/.test(body);
+  const isNo = /^n(o)?$/.test(body);
+  const isAttendanceCheck = record?.kind === "post";
+
   let reply;
   if (!record) {
-    reply = "Thanks for your text! We don't have an open confirmation for this number right now.";
+    reply = "Thanks for your text! We don't have an open question for this number right now.";
   } else if (record.confirmed !== null) {
     reply = "Got it — we already have your reply for this one, thanks!";
-  } else if (/^y(es)?$/.test(body)) {
-    record.confirmed = true;
+  } else if (isYes || isNo) {
+    record.confirmed = isYes;
     await pendingStore.setJSON(from, record);
-    reply = `Great, see you at ${record.sessionLabel}! 🎬`;
-  } else if (/^n(o)?$/.test(body)) {
-    record.confirmed = false;
-    await pendingStore.setJSON(from, record);
-    reply = "No worries, thanks for letting us know — hope to see you next time!";
+
+    if (isAttendanceCheck) {
+      await markAttendance(from, isYes);
+      reply = isYes ? "Great, glad you made it! 🎬" : "Thanks for letting us know — hope to see you next time!";
+    } else {
+      reply = isYes ? `Great, see you at ${record.sessionLabel}! 🎬` : "No worries, thanks for letting us know — hope to see you next time!";
+    }
   } else {
-    reply = "Just reply Y or N to let us know if you're still coming tonight.";
+    reply = isAttendanceCheck
+      ? "Just reply Y or N to let us know if you attended tonight."
+      : "Just reply Y or N to let us know if you're still coming tonight.";
   }
 
   const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escapeXml(reply)}</Message></Response>`;

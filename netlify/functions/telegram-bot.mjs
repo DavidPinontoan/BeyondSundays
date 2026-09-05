@@ -21,9 +21,19 @@
  * registering the webhook and sending /today.
  */
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { sendTelegramMessage, sendTelegramDocument } from "./lib/telegram.mjs";
-import { searchPeopleByPhone, markAttendance, assignTeacher, getAllPeople } from "./lib/people-store.mjs";
-import { TIMEZONE, buildTodayReport, buildWeekReport } from "./lib/reports.mjs";
+import { searchPeopleByPhone, markAttendance, assignTeacher, getPersonByPhone } from "./lib/people-store.mjs";
+import { fetchAllRsvpSubmissions } from "./lib/netlify-forms.mjs";
+import {
+  TIMEZONE, buildTodayReport, buildWeekReport, customDateCode,
+  sydneyDateKey, sydneyTodayCalendarProxy, mondayOf, inRange,
+} from "./lib/reports.mjs";
+
+const TOPICS = JSON.parse(
+  readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
+);
 
 export default async (req) => {
   if (req.method !== "POST") {
@@ -56,8 +66,8 @@ export default async (req) => {
     await sendTelegramMessage(chatId, await handleAttendCommand(text.slice("/attend".length).trim()));
   } else if (text.startsWith("/teacher")) {
     await sendTelegramMessage(chatId, await handleTeacherCommand(text.slice("/teacher".length).trim()));
-  } else if (text === "/export") {
-    await handleExportCommand(chatId);
+  } else if (text.startsWith("/export")) {
+    await handleExportCommand(chatId, text.slice("/export".length).trim().toLowerCase());
   } else {
     await sendTelegramMessage(
       chatId,
@@ -68,7 +78,7 @@ export default async (req) => {
         "/search <number> - find someone by mobile number, e.g. /search 0402248977",
         "/attend <number> yes|no - mark whether they attended",
         "/teacher <number> <teacher name> - assign a teacher",
-        "/export - download all signups as a CSV file",
+        "/export week|month|year - download signups from that period as a CSV file",
       ].join("\n")
     );
   }
@@ -140,22 +150,50 @@ async function handleTeacherCommand(args) {
   return `Assigned ${teacherName} as ${record.name}'s teacher.`;
 }
 
-async function handleExportCommand(chatId) {
-  const people = await getAllPeople();
-  if (people.length === 0) {
-    await sendTelegramMessage(chatId, "No signups to export yet.");
+const EXPORT_PERIODS = ["week", "month", "year"];
+
+async function handleExportCommand(chatId, period) {
+  if (!EXPORT_PERIODS.includes(period)) {
+    await sendTelegramMessage(chatId, "Usage: /export week|month|year");
     return;
   }
 
-  const rows = [["Name", "Number", "Joined", "Topic", "Attended", "Teacher"]];
-  for (const p of people) {
-    const joined = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(new Date(p.joinedAt));
-    const attended = p.attended === true ? "Yes" : p.attended === false ? "No" : "";
-    rows.push([p.name, p.phone, joined, p.topicTitle || p.topicSlug || "", attended, p.teacherAssigned || ""]);
+  const todayProxy = sydneyTodayCalendarProxy();
+  const todayKey = sydneyDateKey(todayProxy);
+  let startProxy;
+  if (period === "week") {
+    startProxy = mondayOf(todayProxy);
+  } else if (period === "month") {
+    startProxy = new Date(Date.UTC(todayProxy.getUTCFullYear(), todayProxy.getUTCMonth(), 1, 12));
+  } else {
+    startProxy = new Date(Date.UTC(todayProxy.getUTCFullYear(), 0, 1, 12));
+  }
+  const startKey = sydneyDateKey(startProxy);
+
+  const submissions = (await fetchAllRsvpSubmissions()).filter((s) => inRange(s.createdAt, startKey, todayKey));
+  if (submissions.length === 0) {
+    await sendTelegramMessage(chatId, `No signups this ${period}.`);
+    return;
+  }
+
+  // A person may have RSVP'd more than once in the period — one CSV row
+  // per person, keeping their most recent signup in it.
+  const latestByPhone = new Map();
+  for (const s of submissions.sort((a, b) => a.createdAt - b.createdAt)) {
+    latestByPhone.set(s.phone.replace(/\s/g, ""), s);
+  }
+
+  const rows = [["Name", "Number", "Signed up", "Topic", "Attended", "Teacher"]];
+  for (const s of latestByPhone.values()) {
+    const person = await getPersonByPhone(s.phone);
+    const signedUp = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(s.createdAt);
+    const topicTitle = TOPICS[s.topicSlug]?.title || s.topicSlug || "";
+    const attended = person?.attended === true ? "Yes" : person?.attended === false ? "No" : "";
+    rows.push([s.name, s.phone, signedUp, topicTitle, attended, person?.teacherAssigned || ""]);
   }
 
   const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
-  const filename = `beyond-sundays-signups-${new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(new Date())}.csv`;
+  const filename = `beyond-sundays-${period}-${customDateCode(todayProxy)}.csv`;
 
   await sendTelegramDocument(chatId, filename, csv);
 }
