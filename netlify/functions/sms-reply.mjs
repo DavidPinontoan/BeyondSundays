@@ -5,6 +5,17 @@
  * pending confirmation (see the `confirm-pending` Blobs store, written by
  * send-reminders.mjs) so the showtime tally can count it.
  *
+ * Every request is verified against Twilio's X-Twilio-Signature header
+ * before anything else happens — without this, this URL being public
+ * means anyone could POST a fake {From, Body} and forge someone else's
+ * attendance/confirmation record. Verification needs TWILIO_AUTH_TOKEN
+ * (already set for outbound sends) and can be disabled by setting
+ * TWILIO_SKIP_SIGNATURE_CHECK=true, ONLY if signature checks start
+ * rejecting genuine replies (a known risk behind some proxies/CDNs,
+ * where the URL Twilio signed against doesn't exactly match what the
+ * function sees) — check this function's logs first; a rejection logs
+ * the computed vs. expected URL to help diagnose a mismatch.
+ *
  * NOT TESTED — no Node.js runtime in the environment this was built in.
  *
  * Requires manual setup in Twilio's console (not something I can do for
@@ -16,13 +27,33 @@
  */
 
 import { getStore } from "@netlify/blobs";
+import twilio from "twilio";
 
 export default async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  const params = new URLSearchParams(await req.text());
+  const rawBody = await req.text();
+  const params = new URLSearchParams(rawBody);
+
+  if (process.env.TWILIO_SKIP_SIGNATURE_CHECK !== "true") {
+    const signature = req.headers.get("x-twilio-signature");
+    const valid =
+      process.env.TWILIO_AUTH_TOKEN &&
+      signature &&
+      twilio.validateRequest(
+        process.env.TWILIO_AUTH_TOKEN,
+        signature,
+        req.url,
+        Object.fromEntries(params)
+      );
+    if (!valid) {
+      console.warn(`Rejected sms-reply: bad/missing Twilio signature for url=${req.url}`);
+      return new Response("Forbidden", { status: 403 });
+    }
+  }
+
   const from = (params.get("From") || "").replace(/\s/g, "");
   const body = (params.get("Body") || "").trim().toLowerCase();
 

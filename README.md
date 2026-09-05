@@ -132,6 +132,34 @@ upgraded to a paid, pay-as-you-go account** (adding a payment method and
 some credit — not a subscription) before any of it can actually send.
 Telegram alerts are unaffected by this and work regardless.
 
+### Abuse protection
+
+- **`send-confirmation.mjs`** (fires per RSVP, each call costs a Twilio
+  SMS once that's upgraded) is rate-limited: max 5 calls per IP per 10
+  minutes, and a 5-minute cooldown per phone number. A blocked call just
+  quietly returns 200 with none of its three effects (SMS, Telegram
+  alert, people-store upsert) — no error surfaces to the submitter either
+  way, since the on-page confirmation is independent client-side state.
+  Backed by `lib/rate-limit.mjs`.
+- **`sms-reply.mjs`** verifies Twilio's `X-Twilio-Signature` header on
+  every request before touching anything — without this, its public URL
+  would let anyone forge a fake `{From, Body}` and manipulate someone
+  else's attendance/confirmation record. If genuine replies start getting
+  rejected (check the function's logs — a rejection logs the URL it
+  validated against), set `TWILIO_SKIP_SIGNATURE_CHECK=true` as a
+  stopgap and let me know, since that usually means the URL Twilio
+  signed against doesn't exactly match what the function sees (a known
+  risk behind some proxies/CDNs), not that requests are actually forged.
+- **Not implemented, needs your own account**: a real CAPTCHA
+  (reCAPTCHA/hCaptcha) on the RSVP form itself — the nearest thing
+  available without a new third-party signup is Netlify's own built-in
+  Forms spam filter (**Site configuration → Forms → Spam filters** →
+  enable Akismet or reCAPTCHA 2), worth turning on alongside the above.
+  The honeypot field (already in place) and the rate limits above are
+  the practical protection for now; nothing can block the underlying
+  Netlify Forms submission itself from function code, only the paid
+  side effects that follow it.
+
 ### How the SMS flow works
 
 1. **On RSVP** — `send-confirmation.mjs` fires immediately (called directly
@@ -246,6 +274,7 @@ netlify/functions/lib/netlify-forms.mjs          Fetches all RSVP submissions ac
 netlify/functions/lib/people-store.mjs           Editable per-person records in Netlify Blobs (attendance, teacher)
 netlify/functions/lib/reports.mjs                Shared /today + /week report builders, used by the bot and the digest
 netlify/functions/lib/admins.mjs                 Role lookup/management (owner/admin/viewer) for the bot
+netlify/functions/lib/rate-limit.mjs              IP rate limit + phone cooldown helpers (see Abuse protection)
 netlify/functions/topics-schedule.json       day/title/Zoom link per topic, read by the functions above
 ```
 

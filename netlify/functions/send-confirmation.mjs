@@ -12,6 +12,15 @@
  *      assignment, none of which Netlify Forms' read-only submissions
  *      can support on their own.
  *
+ * Before any of that: an IP rate limit (max 5 calls per 10 minutes) and a
+ * per-phone cooldown (5 minutes) guard against someone spamming the RSVP
+ * form — each call here fires a paid Twilio SMS, so this is where abuse
+ * actually costs money, even though the underlying Netlify Forms
+ * submission itself can't be blocked from here. A blocked call just
+ * quietly returns 200 with none of the three effects above — no error
+ * surfaced to the client either way, since the on-page confirmation is
+ * independent client-side state.
+ *
  * NOT TESTED — no Node.js runtime in the environment this was built in.
  * Check this function's logs in the Netlify dashboard after your first
  * real RSVP.
@@ -27,6 +36,10 @@ import { fileURLToPath } from "node:url";
 import twilio from "twilio";
 import { sendAdminAlert } from "./lib/telegram.mjs";
 import { upsertPerson } from "./lib/people-store.mjs";
+import { getClientIp, checkAndBumpRate, checkAndBumpCooldown } from "./lib/rate-limit.mjs";
+
+const IP_LIMIT = { max: 5, windowMs: 10 * 60 * 1000 };
+const PHONE_COOLDOWN_MS = 5 * 60 * 1000;
 
 const TOPICS = JSON.parse(
   readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
@@ -48,6 +61,14 @@ export default async (req) => {
   const topic = TOPICS[topicSlug];
   if (!name || !phone || !topic || (session !== "7pm" && session !== "9pm")) {
     return new Response("Missing or invalid fields", { status: 400 });
+  }
+
+  const ip = getClientIp(req);
+  const ipOk = await checkAndBumpRate("rsvp-ip-limit", ip, IP_LIMIT);
+  const phoneOk = await checkAndBumpCooldown("rsvp-phone-cooldown", phone.replace(/\s/g, ""), PHONE_COOLDOWN_MS);
+  if (!ipOk || !phoneOk) {
+    console.warn(`Rate-limited RSVP: ip=${ip} phone=${phone} ipOk=${ipOk} phoneOk=${phoneOk}`);
+    return new Response("OK", { status: 200 });
   }
 
   const sessionLabel = session === "7pm" ? "7:00 PM" : "9:00 PM";
