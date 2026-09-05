@@ -35,6 +35,16 @@ export async function fetchAllRsvpSubmissions() {
     if (batch.length < perPage) break;
   }
 
+  // TEMPORARY DEBUG — remove once the /today date-boundary issue is
+  // diagnosed. Logs the raw created_at string Netlify's API actually
+  // returns, since new Date(s.created_at) could be parsing it wrong
+  // (e.g. as local time instead of UTC) if it lacks a clear timezone
+  // marker, which would shift some submissions across a day boundary.
+  console.log(
+    "DEBUG raw submissions:",
+    JSON.stringify(all.map((s) => ({ name: s.data?.name, created_at: s.created_at, parsed: new Date(s.created_at).toISOString() })))
+  );
+
   return all
     .filter((s) => s.data && s.data.name && s.data.phone && s.created_at)
     .map((s) => ({
