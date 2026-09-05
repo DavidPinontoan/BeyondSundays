@@ -173,7 +173,11 @@ Netlify Forms submissions are append-only with no update endpoint, so
 this store is what makes `/search`, and later attendance tracking and
 teacher assignment, possible at all. Re-RSVPing updates the same record
 (topic/session) rather than creating a duplicate; `joinedAt` stays fixed
-at their first-ever signup. Still left for a later pass: CSV export, scheduled Saturday-night digest,
+at their first-ever signup.
+
+An automatic weekly digest (`weekly-digest.mjs`, same report as `/week`)
+also fires on its own every Saturday night at 9:00 PM Sydney time —
+nobody has to remember to ask. Still left for a later pass: CSV export
 and permission levels (right now there's exactly one admin,
 `TELEGRAM_CHAT_ID`).
 
@@ -194,11 +198,14 @@ js/embers.js                Ambient candle-ember canvas overlay
 server/app.py              Flask static-file server for local preview only (see Running it locally)
 netlify.toml               Netlify build config: publish "." and the functions directory
 netlify/functions/send-reminders.mjs        Scheduled (15-min) function: 1hr-before Y/N prompts, Zoom links at showtime, organizer tally
-netlify/functions/send-confirmation.mjs      Fired on RSVP submit: instant "you're confirmed" text + Telegram alert
+netlify/functions/send-confirmation.mjs      Fired on RSVP submit: instant "you're confirmed" text, Telegram alert, people-store upsert
 netlify/functions/sms-reply.mjs               Twilio inbound webhook: records Y/N replies
-netlify/functions/telegram-bot.mjs             Telegram webhook: /today and /week admin commands
+netlify/functions/telegram-bot.mjs             Telegram webhook: /today, /week, /search, /attend, /teacher
+netlify/functions/weekly-digest.mjs             Scheduled (15-min) function: automatic /week report every Saturday 9pm
 netlify/functions/lib/telegram.mjs              Telegram Bot API helper (setup instructions inline)
 netlify/functions/lib/netlify-forms.mjs          Fetches all RSVP submissions across topics, paginated
+netlify/functions/lib/people-store.mjs           Editable per-person records in Netlify Blobs (attendance, teacher)
+netlify/functions/lib/reports.mjs                Shared /today + /week report builders, used by the bot and the digest
 netlify/functions/topics-schedule.json       day/title/Zoom link per topic, read by the functions above
 ```
 
