@@ -21,7 +21,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import twilio from "twilio";
-import { sendTelegramAlert } from "./lib/telegram.mjs";
+import { sendAdminAlert } from "./lib/telegram.mjs";
 
 const TOPICS = JSON.parse(
   readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
@@ -65,7 +65,7 @@ export default async (req) => {
   }
 
   try {
-    await sendTelegramAlert(`🆕 New Signup\n${name}\n${phone}\n\n${topic.title} — ${topic.day} ${sessionLabel}`);
+    await sendAdminAlert(`New Signup\n${name}\n${phone}\n\n${topic.title} — ${topic.day} ${sessionLabel}`);
   } catch (err) {
     console.error("Telegram alert failed:", err);
   }

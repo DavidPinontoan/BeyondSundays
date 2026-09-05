@@ -106,12 +106,17 @@ manually invoke `send-reminders.mjs` before deploying. Requires Node.js.
    `https://<your-site>.netlify.app/.netlify/functions/sms-reply`.
 4. Deploy. Once a real RSVP comes in, it'll appear under the site's
    **Forms → rsvp** tab in the dashboard.
-5. Fill in real Zoom links in `netlify/functions/topics-schedule.json`
+5. Register the Telegram bot's webhook so `/today` and `/week` work: visit
+   `https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<your-site>.netlify.app/.netlify/functions/telegram-bot`
+   once in a browser (fill in your real token and site URL). After this,
+   `getUpdates` stops returning anything — that's expected, not an error.
+6. Fill in real Zoom links in `netlify/functions/topics-schedule.json`
    (currently placeholders).
 
-`send-reminders.mjs`, `send-confirmation.mjs`, and `sms-reply.mjs` were all
-written against Netlify's and Twilio's documented APIs but **have not been
-run** — there's no Node.js available in the environment they were built in.
+`send-reminders.mjs`, `send-confirmation.mjs`, `sms-reply.mjs`, and
+`telegram-bot.mjs` were all written against Netlify's, Twilio's, and
+Telegram's documented APIs but **have not been run** — there's no Node.js
+available in the environment they were built in.
 Check each function's logs in the Netlify dashboard (Functions tab) after
 your first deploy, after a real RSVP, and after the first showtime rolls
 around; without the Twilio env vars set, sends are just logged rather than
@@ -142,6 +147,25 @@ Telegram alerts are unaffected by this and work regardless.
    gate on getting the link), then texts `ORGANIZER_PHONE` one summary
    line with the confirmed/declined/no-reply tally.
 
+### Telegram admin bot
+
+Every RSVP sends a "New Signup" alert to your Telegram chat (via
+`send-confirmation.mjs`), independent of whether Twilio is working. You
+can also message the bot directly:
+
+- `/today` — today's signups by name and time, plus running totals for
+  the week and month
+- `/week` — signups per day, Monday through Saturday (this project's
+  "week" ends Saturday night — there's no Sunday topic), plus growth %
+  compared with the previous week
+
+Only messages from `TELEGRAM_CHAT_ID` get a reply; anyone else who finds
+the bot is silently ignored. This is a first slice of a much bigger bot
+spec (search, attendance tracking, teacher assignment, CSV export,
+scheduled weekly digests, permission levels) — those need a real
+editable data store instead of read-only Netlify Forms submissions, so
+they're intentionally left for a later pass.
+
 ## Project layout
 
 ```
@@ -159,8 +183,11 @@ js/embers.js                Ambient candle-ember canvas overlay
 server/app.py              Flask static-file server for local preview only (see Running it locally)
 netlify.toml               Netlify build config: publish "." and the functions directory
 netlify/functions/send-reminders.mjs        Scheduled (15-min) function: 1hr-before Y/N prompts, Zoom links at showtime, organizer tally
-netlify/functions/send-confirmation.mjs      Fired on RSVP submit: instant "you're confirmed" text
+netlify/functions/send-confirmation.mjs      Fired on RSVP submit: instant "you're confirmed" text + Telegram alert
 netlify/functions/sms-reply.mjs               Twilio inbound webhook: records Y/N replies
+netlify/functions/telegram-bot.mjs             Telegram webhook: /today and /week admin commands
+netlify/functions/lib/telegram.mjs              Telegram Bot API helper (setup instructions inline)
+netlify/functions/lib/netlify-forms.mjs          Fetches all RSVP submissions across topics, paginated
 netlify/functions/topics-schedule.json       day/title/Zoom link per topic, read by the functions above
 ```
 

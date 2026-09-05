@@ -1,7 +1,6 @@
 /**
  * Tiny Telegram Bot API helper — no SDK needed, it's just a POST to
- * Telegram's HTTP API. Shared by any function that needs to alert the
- * admin (new signups now; follow-ups/attendance later).
+ * Telegram's HTTP API.
  *
  * Setup (do this once):
  *   1. Message @BotFather on Telegram, send `/newbot`, follow the prompts.
@@ -16,12 +15,11 @@
  * Without both vars set, alerts are just logged instead of sent.
  */
 
-export async function sendTelegramAlert(text) {
+export async function sendTelegramMessage(chatId, text) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
 
   if (!token || !chatId) {
-    console.log(`[TELEGRAM SCAFFOLD] Would send:\n${text}`);
+    console.log(`[TELEGRAM SCAFFOLD] Would send to ${chatId}:\n${text}`);
     return;
   }
 
@@ -32,6 +30,11 @@ export async function sendTelegramAlert(text) {
   });
 
   if (!res.ok) {
-    console.error(`Telegram alert failed: ${res.status} ${await res.text()}`);
+    console.error(`Telegram send failed: ${res.status} ${await res.text()}`);
   }
+}
+
+/** Convenience wrapper for one-way alerts to the configured admin chat. */
+export async function sendAdminAlert(text) {
+  return sendTelegramMessage(process.env.TELEGRAM_CHAT_ID, text);
 }
