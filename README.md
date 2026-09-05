@@ -187,18 +187,14 @@ Every RSVP sends a "New Signup" alert to your Telegram chat (via
 `send-confirmation.mjs`), independent of whether Twilio is working. You
 can also message the bot directly:
 
-- `/today` — today's topic and total, then each signup numbered with
-  name, mobile number (tap to copy), and their attended/teacher/picked
-  status, plus a CSV attachment of the same
-- `/week` — each of the six days (Mon–Sat) with its topic and count,
-  plus growth % vs. the previous week; the full per-person breakdown
-  (same fields as `/today`) comes as a CSV attachment, since a week's
-  worth of names would be too long for one Telegram message
-- `/stats` — total members, this week/month, how many are continuing
-  with a teacher, how many "picked" (agreed to keep studying), and
-  month-over-month growth %
-- `/topics` — enrollment count per topic, based on each person's most
-  recent RSVP
+- `/today` — everyone who signed up today (for whatever topic they
+  picked — not just whatever airs today, since the RSVP form works on
+  any topic's page at any time), each numbered with name, mobile number
+  (tap to copy), their topic, and attended/teacher/picked status, plus
+  totals (signups, meeting-with-teacher, picked) and a CSV attachment
+- `/week` — the same per-person detail, grouped under each of the six
+  days (Mon–Sat) with that day's topic, plus totals and growth % vs.
+  the previous week, and a full CSV attachment
 - `/search <number>` — find someone by mobile number (local `04XX XXX
   XXX` or international `+61 4XX XXX XXX`, spaces optional); shows join
   date, topic, and attended/teacher/picked status
@@ -226,11 +222,11 @@ field once SMS sending works). See `lib/phone.mjs`.
 **Access levels** (`netlify/functions/lib/admins.mjs`): **owner** (always
 `TELEGRAM_CHAT_ID` — hardcoded, not stored, so you can't lock yourself
 out) can do everything, including managing other admins; **admin** can
-do everything except that; **viewer** is read-only (`/today`, `/week`,
-`/stats`, `/topics` only — no `/search`, since that exposes phone
-numbers, and no `/attend`/`/teacher`/`/export`, since those mutate or
-export data). Anyone with no role at all is silently ignored — the bot
-gives no sign it has data to give up.
+do everything except that; **viewer** is read-only (`/today`/`/week`
+only — no `/search`, since that exposes phone numbers, and no
+`/attend`/`/teacher`/`/export`, since those mutate or export data).
+Anyone with no role at all is silently ignored — the bot gives no sign
+it has data to give up.
 
 Owner-only commands to manage access:
 - `/listadmins` — list everyone with access and their role

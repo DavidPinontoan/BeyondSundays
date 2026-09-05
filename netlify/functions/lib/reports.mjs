@@ -50,40 +50,46 @@ async function buildPersonRows(submissions) {
   return rows;
 }
 
+/** Formats the trailing "Total meeting with teacher / Total picked"
+ *  lines shared by /today and /week — a count is only "Y" (not TBC or
+ *  N) when actually confirmed by an admin. */
+function totalsLines(rows) {
+  const withTeacher = rows.filter((r) => r.teacher === "Y").length;
+  const picked = rows.filter((r) => r.picked === "Y").length;
+  return [`Total meeting with teacher: ${withTeacher}`, `Total picked: ${picked}`];
+}
+
 export async function buildTodayReport() {
   const submissions = await fetchAllRsvpSubmissions();
   const todayProxy = sydneyTodayCalendarProxy();
   const todayKey = sydneyDateKey(todayProxy);
-  const monday = mondayOf(todayProxy);
-  const monthStart = new Date(Date.UTC(todayProxy.getUTCFullYear(), todayProxy.getUTCMonth(), 1, 12));
-  const weekKey = sydneyDateKey(monday);
-  const monthKey = sydneyDateKey(monthStart);
 
+  // "Today" means people who signed up today, for whatever topic they
+  // picked — not everyone scheduled for today's own topic, since the
+  // RSVP form lets someone sign up for any topic's page at any time.
   const todaySubmissions = submissions
     .filter((s) => sydneyDateKey(s.createdAt) === todayKey)
     .sort((a, b) => a.createdAt - b.createdAt);
-  const weekCount = submissions.filter((s) => inRange(s.createdAt, weekKey, todayKey)).length;
-  const monthCount = submissions.filter((s) => inRange(s.createdAt, monthKey, todayKey)).length;
 
   const weekdayName = new Intl.DateTimeFormat("en-AU", { timeZone: TIMEZONE, weekday: "long" }).format(todayProxy);
   const dateLabel = `${customDateCode(todayProxy)} (${weekdayName})`;
-  const topicTitle = topicTitleForDay(weekdayName) || "No topic today";
 
   const rows = await buildPersonRows(todaySubmissions);
 
   const personLines = rows.map((r, i) => {
     const teacherSuffix = r.teacherName ? ` (${escapeHtml(r.teacherName)})` : "";
     return [
-      `${i + 1}. <code>${escapeHtml(toLocalPhone(r.phone))}</code> <b>${escapeHtml(r.name)}</b>`,
+      `${i + 1}. <code>${escapeHtml(toLocalPhone(r.phone))}</code> <b>${escapeHtml(r.name)}</b> — ${escapeHtml(r.topicTitle)}`,
       `   Attended: ${r.attended} · Teacher: ${r.teacher}${teacherSuffix} · Picked: ${r.picked}`,
     ].join("\n");
   });
 
   const text = [
-    `<b>Today: ${escapeHtml(topicTitle)}</b> (${rows.length}) — ${dateLabel}`,
+    `<b>Today</b> (${rows.length}) — ${dateLabel}`,
     ...(personLines.length > 0 ? ["", ...personLines] : ["", "No signups today."]),
     "",
-    `This week: ${weekCount} · This month: ${monthCount}`,
+    `Total: ${rows.length} signups`,
+    ...totalsLines(rows),
   ].join("\n");
 
   const csvRows = [
@@ -111,8 +117,13 @@ export async function buildWeekReport() {
   const daySubmissions = dayKeys.map((key) =>
     submissions.filter((s) => sydneyDateKey(s.createdAt) === key).sort((a, b) => a.createdAt - b.createdAt)
   );
-  const counts = daySubmissions.map((arr) => arr.length);
-  const total = counts.reduce((a, b) => a + b, 0);
+
+  const dayRows = [];
+  for (let i = 0; i < WEEK_DAY_FULL.length; i++) {
+    dayRows.push(await buildPersonRows(daySubmissions[i]));
+  }
+  const allRows = dayRows.flat();
+  const total = allRows.length;
 
   const lastMonday = addDays(monday, -7);
   const lastSaturday = addDays(monday, -2);
@@ -125,21 +136,30 @@ export async function buildWeekReport() {
       ? `${total >= lastWeekTotal ? "+" : ""}${Math.round(((total - lastWeekTotal) / lastWeekTotal) * 100)}% compared with last week`
       : "No data from last week to compare";
 
+  const dayBlocks = WEEK_DAY_LABELS.map((label, i) => {
+    const title = topicTitleForDay(WEEK_DAY_FULL[i]) || "—";
+    const rows = dayRows[i];
+    const heading = `<b>${label} ${escapeHtml(title)}</b> (${rows.length})`;
+    if (rows.length === 0) return heading;
+    const people = rows.map(
+      (r) => `  <code>${escapeHtml(toLocalPhone(r.phone))}</code> ${escapeHtml(r.name)}`
+    );
+    return [heading, ...people].join("\n");
+  });
+
   const text = [
     "<b>Beyond Sundays — Weekly Report</b>",
     "",
-    ...WEEK_DAY_LABELS.map((label, i) => {
-      const title = topicTitleForDay(WEEK_DAY_FULL[i]) || "—";
-      return `${label} ${escapeHtml(title)}: ${counts[i]}`;
-    }),
+    dayBlocks.join("\n\n"),
+    "",
     `Total: ${total} signups`,
+    ...totalsLines(allRows),
     growthLine,
   ].join("\n");
 
   const csvRows = [["Day", "Topic", "Name", "Number", "Signed up", "Attended", "Teacher", "Picked"]];
   for (let i = 0; i < WEEK_DAY_FULL.length; i++) {
-    const rows = await buildPersonRows(daySubmissions[i]);
-    for (const r of rows) {
+    for (const r of dayRows[i]) {
       csvRows.push([
         WEEK_DAY_FULL[i],
         r.topicTitle,

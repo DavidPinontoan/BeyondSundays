@@ -1,8 +1,11 @@
 /**
  * Telegram bot webhook — handles admin commands typed directly into the
- * Telegram chat with the bot: /today, /week, /stats, /topics, /search,
- * /attend, /teacher, /picked, /export, plus admin management (/addadmin,
- * /removeadmin, /listadmins, /myrole).
+ * Telegram chat with the bot: /today, /week, /search, /attend, /teacher,
+ * /picked, /export, plus admin management (/addadmin, /removeadmin,
+ * /listadmins, /myrole).
+ *
+ * /today and /week fold in what /stats and /topics used to show
+ * separately (totals, per-topic breakdown) — see lib/reports.mjs.
  *
  * One-time setup, after TELEGRAM_BOT_TOKEN is set in Netlify and deployed:
  * visit this URL once in a browser (replace both placeholders):
@@ -17,7 +20,7 @@
  * Three roles (see lib/admins.mjs): owner (always TELEGRAM_CHAT_ID —
  * hardcoded, not stored, so you can't lock yourself out), admin (full
  * access except managing other admins), and viewer (read-only: /today,
- * /week, /stats, /topics — no /search, /attend, /teacher, /export).
+ * /week — no /search, /attend, /teacher, /export).
  * Anyone with no role at all is silently ignored, so a stranger can't
  * even tell the bot has data to give up.
  *
@@ -29,7 +32,6 @@
 import { sendTelegramMessage, sendTelegramDocument, escapeHtml } from "./lib/telegram.mjs";
 import {
   searchPeopleByPhone, markAttendance, assignTeacher, markPicked, getPersonByPhone,
-  getAllPeople, getTopicCounts,
 } from "./lib/people-store.mjs";
 import { fetchAllRsvpSubmissions } from "./lib/netlify-forms.mjs";
 import {
@@ -50,8 +52,6 @@ const MANAGE_ROLES = ["owner", "admin"];
 const COMMANDS = [
   { key: "/today", match: (t) => t === "/today", roles: ALL_ROLES, direct: true, run: (_t, ctx) => handleTodayCommand(ctx.chatId) },
   { key: "/week", match: (t) => t === "/week", roles: ALL_ROLES, direct: true, run: (_t, ctx) => handleWeekCommand(ctx.chatId) },
-  { key: "/stats", match: (t) => t === "/stats", roles: ALL_ROLES, run: () => buildStatsReport() },
-  { key: "/topics", match: (t) => t === "/topics", roles: ALL_ROLES, run: () => buildTopicsReport() },
   { key: "/myrole", match: (t) => t === "/myrole", roles: ALL_ROLES, run: (_t, ctx) => `Your role: ${ctx.role}` },
   {
     key: "/search", match: (t) => t.startsWith("/search"), roles: MANAGE_ROLES, html: true,
@@ -88,10 +88,8 @@ const HELP_TEXT = [
   "<b>Beyond Sundays</b>",
   "",
   "<b>Reports</b>",
-  "/today — today's signups (names + numbers + teacher/picked status), plus a CSV",
-  "/week — this week's signups by day, plus a full CSV",
-  "/stats — overall statistics and growth",
-  "/topics — enrollment count per topic",
+  "/today — today's signups: name, number, topic, attended/teacher/picked, plus a CSV",
+  "/week — every signup this week, by day, with totals; plus a full CSV",
   "",
   "<b>Manage a person</b> (find their number with /today or /search first)",
   "/search <code>&lt;number&gt;</code> — find someone, e.g. /search 0412 345 678",
@@ -178,53 +176,6 @@ async function handleWeekCommand(chatId) {
     const filename = `beyond-sundays-week-${customDateCode(sydneyTodayCalendarProxy())}.csv`;
     await sendTelegramDocument(chatId, filename, toCsv(csvRows));
   }
-}
-
-async function buildStatsReport() {
-  const people = await getAllPeople();
-  const todayProxy = sydneyTodayCalendarProxy();
-  const todayKey = sydneyDateKey(todayProxy);
-  const weekStartKey = sydneyDateKey(mondayOf(todayProxy));
-  const monthStartKey = sydneyDateKey(new Date(Date.UTC(todayProxy.getUTCFullYear(), todayProxy.getUTCMonth(), 1, 12)));
-  const lastMonthStartKey = sydneyDateKey(new Date(Date.UTC(todayProxy.getUTCFullYear(), todayProxy.getUTCMonth() - 1, 1, 12)));
-  const lastMonthEndKey = sydneyDateKey(new Date(Date.UTC(todayProxy.getUTCFullYear(), todayProxy.getUTCMonth(), 0, 12)));
-
-  const joinedKey = (p) => sydneyDateKey(new Date(p.joinedAt));
-  const thisWeek = people.filter((p) => joinedKey(p) >= weekStartKey && joinedKey(p) <= todayKey).length;
-  const thisMonth = people.filter((p) => joinedKey(p) >= monthStartKey && joinedKey(p) <= todayKey).length;
-  const lastMonth = people.filter((p) => joinedKey(p) >= lastMonthStartKey && joinedKey(p) <= lastMonthEndKey).length;
-  const withTeacher = people.filter((p) => p.teacherAssigned).length;
-  const picked = people.filter((p) => p.picked === true).length;
-
-  const growthLine =
-    lastMonth > 0
-      ? `${thisMonth >= lastMonth ? "+" : ""}${Math.round(((thisMonth - lastMonth) / lastMonth) * 100)}% vs last month`
-      : "No data from last month to compare";
-
-  return [
-    "Beyond Sundays - Statistics",
-    "",
-    `Total members: ${people.length}`,
-    `This week: ${thisWeek}`,
-    `This month: ${thisMonth}`,
-    `Continuing with a teacher: ${withTeacher}`,
-    `Agreed to keep studying (picked): ${picked}`,
-    "",
-    "Growth",
-    `Last month: ${lastMonth}`,
-    `This month: ${thisMonth}`,
-    growthLine,
-  ].join("\n");
-}
-
-async function buildTopicsReport() {
-  const counts = await getTopicCounts();
-  const lines = Object.entries(counts)
-    .sort(([, a], [, b]) => b - a)
-    .map(([slug, count]) => `${TOPICS[slug]?.title || slug} - ${count} student${count === 1 ? "" : "s"}`);
-
-  if (lines.length === 0) return "No enrollments yet.";
-  return ["Beyond Sundays - Topics", "", ...lines].join("\n");
 }
 
 async function buildListAdminsReport() {
