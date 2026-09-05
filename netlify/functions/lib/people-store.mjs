@@ -50,6 +50,18 @@ export async function getAllPeople() {
   return people.filter(Boolean);
 }
 
+/** Enrollment count per topic, based on each person's most recent
+ *  topicSlug — used by /topics. */
+export async function getTopicCounts() {
+  const all = await getAllPeople();
+  const counts = {};
+  for (const p of all) {
+    const key = p.topicSlug || "unknown";
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return counts;
+}
+
 function digitsOnly(s) {
   return (s || "").replace(/\D/g, "");
 }

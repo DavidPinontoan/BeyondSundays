@@ -164,6 +164,10 @@ can also message the bot directly:
 - `/week` — signups per day, Monday through Saturday (this project's
   "week" ends Saturday night — there's no Sunday topic), plus growth %
   compared with the previous week
+- `/stats` — total members, this week/month, how many are continuing
+  with a teacher, and month-over-month growth %
+- `/topics` — enrollment count per topic, based on each person's most
+  recent RSVP
 - `/search <number>` — find someone by mobile number (local `04XX XXX
   XXX` or international `+61 4XX XXX XXX`, spaces optional); shows join
   date, topic, attendance, and teacher assignment
@@ -174,9 +178,25 @@ can also message the bot directly:
 - `/export week|month|year` — sends a CSV of that period's signups (name,
   number, signed-up date, topic, attended, teacher); one row per person
   even if they RSVP'd more than once in the period
+- `/myrole` — shows your own access level
 
-Only messages from `TELEGRAM_CHAT_ID` get a reply; anyone else who finds
-the bot is silently ignored.
+**Access levels** (`netlify/functions/lib/admins.mjs`): **owner** (always
+`TELEGRAM_CHAT_ID` — hardcoded, not stored, so you can't lock yourself
+out) can do everything, including managing other admins; **admin** can
+do everything except that; **viewer** is read-only (`/today`, `/week`,
+`/stats`, `/topics` only — no `/search`, since that exposes phone
+numbers, and no `/attend`/`/teacher`/`/export`, since those mutate or
+export data). Anyone with no role at all is silently ignored — the bot
+gives no sign it has data to give up.
+
+Owner-only commands to manage access:
+- `/listadmins` — list everyone with access and their role
+- `/addadmin <chat_id> admin|viewer [label]` — grant access (find their
+  chat ID the same way you found your own: have them message the bot
+  anything, then check **Functions → telegram-bot → logs** — every
+  message from a not-yet-granted chat is logged with its chat ID before
+  being silently ignored)
+- `/removeadmin <chat_id>` — revoke access
 
 **Date format**: reports and CSV filenames use a custom compact date
 code instead of the real calendar year — the year is offset so 2026
@@ -193,9 +213,11 @@ at their first-ever signup.
 
 An automatic weekly digest (`weekly-digest.mjs`, same report as `/week`)
 also fires on its own every Saturday night at 9:00 PM Sydney time —
-nobody has to remember to ask. Still left for a later pass: permission
-levels (right now there's exactly one admin, `TELEGRAM_CHAT_ID`) and
-missed-class re-engagement.
+nobody has to remember to ask. Still left for a later pass: `/yesterday`
+`/month` `/all` with pagination, inline buttons on the signup alert and
+reports, and missed-class re-engagement. One field from the original
+spec — "agree to study 3x (picked)" under `/stats` — isn't implemented
+since there's no tracked field for what that should actually mean yet.
 
 ## Project layout
 
@@ -216,12 +238,13 @@ netlify.toml               Netlify build config: publish "." and the functions d
 netlify/functions/send-reminders.mjs        Scheduled (15-min) function: 1hr-before Y/N prompts, Zoom links at showtime, organizer tally
 netlify/functions/send-confirmation.mjs      Fired on RSVP submit: instant "you're confirmed" text, Telegram alert, people-store upsert
 netlify/functions/sms-reply.mjs               Twilio inbound webhook: records Y/N replies
-netlify/functions/telegram-bot.mjs             Telegram webhook: /today, /week, /search, /attend, /teacher, /export
+netlify/functions/telegram-bot.mjs             Telegram webhook: /today, /week, /stats, /topics, /search, /attend, /teacher, /export, admin management
 netlify/functions/weekly-digest.mjs             Scheduled (15-min) function: automatic /week report every Saturday 9pm
 netlify/functions/lib/telegram.mjs              Telegram Bot API helper (setup instructions inline)
 netlify/functions/lib/netlify-forms.mjs          Fetches all RSVP submissions across topics, paginated
 netlify/functions/lib/people-store.mjs           Editable per-person records in Netlify Blobs (attendance, teacher)
 netlify/functions/lib/reports.mjs                Shared /today + /week report builders, used by the bot and the digest
+netlify/functions/lib/admins.mjs                 Role lookup/management (owner/admin/viewer) for the bot
 netlify/functions/topics-schedule.json       day/title/Zoom link per topic, read by the functions above
 ```
 
