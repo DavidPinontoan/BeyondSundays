@@ -158,8 +158,9 @@ can also message the bot directly:
 - `/week` — signups per day, Monday through Saturday (this project's
   "week" ends Saturday night — there's no Sunday topic), plus growth %
   compared with the previous week
-- `/search <name>` — find someone by name; shows join date, topic,
-  attendance, and teacher assignment
+- `/search <number>` — find someone by mobile number (local `04XX XXX
+  XXX` or international `+61 4XX XXX XXX`, spaces optional); shows join
+  date, topic, attendance, and teacher assignment
 
 Only messages from `TELEGRAM_CHAT_ID` get a reply; anyone else who finds
 the bot is silently ignored.

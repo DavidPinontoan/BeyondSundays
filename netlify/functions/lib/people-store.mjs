@@ -50,10 +50,32 @@ export async function getAllPeople() {
   return people.filter(Boolean);
 }
 
-export async function searchPeopleByName(query) {
+function digitsOnly(s) {
+  return (s || "").replace(/\D/g, "");
+}
+
+/** Last 9 digits — the actual mobile number, ignoring whether it's
+ *  written as "04XX XXX XXX" (local) or "+61 4XX XXX XXX" (international),
+ *  since both end in the same 9 digits. */
+function mobileCore(s) {
+  return digitsOnly(s).slice(-9);
+}
+
+/** Search by phone number — accepts either local (04XX XXX XXX) or
+ *  international (+61 4XX XXX XXX) format, with or without spaces. An
+ *  exact 9-digit-core match is preferred; a partial query (e.g. just the
+ *  last few digits) falls back to a substring match so long as it's at
+ *  least 4 digits, to avoid matching everyone on a too-short query. */
+export async function searchPeopleByPhone(query) {
+  const queryDigits = digitsOnly(query);
+  if (queryDigits.length < 4) return [];
+
   const all = await getAllPeople();
-  const needle = query.trim().toLowerCase();
-  return all.filter((p) => p.name.toLowerCase().includes(needle));
+  const queryCore = mobileCore(query);
+  const exact = all.filter((p) => mobileCore(p.phone) === queryCore);
+  if (exact.length > 0) return exact;
+
+  return all.filter((p) => digitsOnly(p.phone).includes(queryDigits));
 }
 
 export async function markAttendance(phone, attended) {

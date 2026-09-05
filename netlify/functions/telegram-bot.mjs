@@ -23,7 +23,7 @@
 
 import { fetchAllRsvpSubmissions } from "./lib/netlify-forms.mjs";
 import { sendTelegramMessage } from "./lib/telegram.mjs";
-import { searchPeopleByName } from "./lib/people-store.mjs";
+import { searchPeopleByPhone } from "./lib/people-store.mjs";
 
 const TIMEZONE = "Australia/Sydney";
 const WEEK_DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -58,7 +58,7 @@ export default async (req) => {
   } else {
     await sendTelegramMessage(
       chatId,
-      "Commands:\n/today - today's signups\n/week - this week's signups by day\n/search <name> - find someone by name"
+      "Commands:\n/today - today's signups\n/week - this week's signups by day\n/search <number> - find someone by mobile number, e.g. /search 0402248977"
     );
   }
 
@@ -128,9 +128,9 @@ async function buildWeekReport() {
 const MAX_SEARCH_RESULTS = 10;
 
 async function buildSearchReport(query) {
-  if (!query) return "Usage: /search <name>";
+  if (!query) return "Usage: /search <number>, e.g. /search 0402248977";
 
-  const matches = await searchPeopleByName(query);
+  const matches = await searchPeopleByPhone(query);
   if (matches.length === 0) return `No one found matching "${query}".`;
 
   const blocks = matches.slice(0, MAX_SEARCH_RESULTS).map((p) => {
