@@ -17,8 +17,9 @@
  */
 
 import { getStore } from "@netlify/blobs";
-import { sendAdminAlert } from "./lib/telegram.mjs";
-import { TIMEZONE, buildWeekReport, isoWeekKey } from "./lib/reports.mjs";
+import { sendAdminAlert, sendTelegramDocument } from "./lib/telegram.mjs";
+import { TIMEZONE, buildWeekReport, isoWeekKey, customDateCode, sydneyTodayCalendarProxy } from "./lib/reports.mjs";
+import { toCsv } from "./lib/csv.mjs";
 
 const DIGEST_HOUR = 21; // 9:00 PM
 const WINDOW_MINUTES = 15;
@@ -38,8 +39,12 @@ export default async () => {
     return new Response("Already sent this week.", { status: 200 });
   }
 
-  const report = await buildWeekReport();
-  await sendAdminAlert(`${report}\n\n(automatic Saturday night report)`);
+  const { text, csvRows } = await buildWeekReport();
+  await sendAdminAlert(`${text}\n\n(automatic Saturday night report)`, { html: true });
+  if (csvRows.length > 1) {
+    const filename = `beyond-sundays-week-${customDateCode(sydneyTodayCalendarProxy())}.csv`;
+    await sendTelegramDocument(process.env.TELEGRAM_CHAT_ID, filename, toCsv(csvRows));
+  }
   await dedupStore.setJSON(key, true);
 
   return new Response("Weekly digest sent.", { status: 200 });

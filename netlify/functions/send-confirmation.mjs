@@ -37,6 +37,7 @@ import twilio from "twilio";
 import { sendAdminAlert, escapeHtml } from "./lib/telegram.mjs";
 import { upsertPerson } from "./lib/people-store.mjs";
 import { getClientIp, checkAndBumpRate, checkAndBumpCooldown } from "./lib/rate-limit.mjs";
+import { toLocalPhone } from "./lib/phone.mjs";
 
 const IP_LIMIT = { max: 5, windowMs: 10 * 60 * 1000 };
 const PHONE_COOLDOWN_MS = 5 * 60 * 1000;
@@ -92,7 +93,7 @@ export default async (req) => {
 
   try {
     await sendAdminAlert(
-      `<b>New Signup</b>\n<b>${escapeHtml(name)}</b>\n<code>${escapeHtml(phone)}</code>\n\n${escapeHtml(topic.title)} — ${escapeHtml(topic.day)} ${sessionLabel}`,
+      `<b>New Signup</b>\n<b>${escapeHtml(name)}</b>\n<code>${escapeHtml(toLocalPhone(phone))}</code>\n\n${escapeHtml(topic.title)} — ${escapeHtml(topic.day)} ${sessionLabel}`,
       { html: true }
     );
   } catch (err) {

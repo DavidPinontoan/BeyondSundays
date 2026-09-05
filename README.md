@@ -187,19 +187,21 @@ Every RSVP sends a "New Signup" alert to your Telegram chat (via
 `send-confirmation.mjs`), independent of whether Twilio is working. You
 can also message the bot directly:
 
-- `/today` — today's signups, numbered, with name and mobile number
-  (tap a number to copy it, then use it with `/attend`/`/teacher`/`/picked`),
-  plus running totals for the week and month
-- `/week` — signups per day, Monday through Saturday (this project's
-  "week" ends Saturday night — there's no Sunday topic), plus growth %
-  compared with the previous week
+- `/today` — today's topic and total, then each signup numbered with
+  name, mobile number (tap to copy), and their attended/teacher/picked
+  status, plus a CSV attachment of the same
+- `/week` — each of the six days (Mon–Sat) with its topic and count,
+  plus growth % vs. the previous week; the full per-person breakdown
+  (same fields as `/today`) comes as a CSV attachment, since a week's
+  worth of names would be too long for one Telegram message
 - `/stats` — total members, this week/month, how many are continuing
-  with a teacher, and month-over-month growth %
+  with a teacher, how many "picked" (agreed to keep studying), and
+  month-over-month growth %
 - `/topics` — enrollment count per topic, based on each person's most
   recent RSVP
 - `/search <number>` — find someone by mobile number (local `04XX XXX
   XXX` or international `+61 4XX XXX XXX`, spaces optional); shows join
-  date, topic, attendance, and teacher assignment
+  date, topic, and attended/teacher/picked status
 - `/attend <number> yes|no` — mark whether they attended (an automatic
   Telegram nudge with the RSVP list arrives an hour after each showing —
   see "How the SMS flow works" above)
@@ -208,9 +210,18 @@ can also message the bot directly:
   person, did they agree to keep studying? (a separate outcome from just
   being assigned one)
 - `/export week|month|year` — sends a CSV of that period's signups (name,
-  number, signed-up date, topic, attended, teacher); one row per person
-  even if they RSVP'd more than once in the period
+  number, signed-up date, topic, attended, teacher, picked); one row per
+  person even if they RSVP'd more than once in the period
 - `/myrole` — shows your own access level
+
+**Attended/teacher/picked show as `TBC`** (to be confirmed) rather than a
+hard Y/N until an admin actually sets them via `/attend`, `/teacher`, or
+`/picked` — an unmanaged person isn't a "no", just not looked at yet.
+
+**Phone numbers always display in local format** (`04XX XXX XXX`) in every
+Telegram message and CSV — regardless of the `+61 4XX XXX XXX` format
+they're actually stored/keyed internally under (needed for Twilio's `to`
+field once SMS sending works). See `lib/phone.mjs`.
 
 **Access levels** (`netlify/functions/lib/admins.mjs`): **owner** (always
 `TELEGRAM_CHAT_ID` — hardcoded, not stored, so you can't lock yourself
@@ -285,6 +296,8 @@ netlify/functions/lib/people-store.mjs           Editable per-person records in 
 netlify/functions/lib/reports.mjs                Shared /today + /week report builders, used by the bot and the digest
 netlify/functions/lib/admins.mjs                 Role lookup/management (owner/admin/viewer) for the bot
 netlify/functions/lib/rate-limit.mjs              IP rate limit + phone cooldown helpers (see Abuse protection)
+netlify/functions/lib/phone.mjs                   Local "04XX XXX XXX" display formatting + Y/N/TBC labels
+netlify/functions/lib/csv.mjs                      Tiny 2D-array-to-CSV-string helper, shared by /today, /week, /export
 netlify/functions/topics-schedule.json       day/title/Zoom link per topic, read by the functions above
 ```
 

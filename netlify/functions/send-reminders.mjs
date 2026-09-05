@@ -43,6 +43,7 @@ import { fileURLToPath } from "node:url";
 import { getStore } from "@netlify/blobs";
 import twilio from "twilio";
 import { sendAdminAlert, escapeHtml } from "./lib/telegram.mjs";
+import { toLocalPhone } from "./lib/phone.mjs";
 
 const TOPICS = JSON.parse(
   readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
@@ -150,7 +151,7 @@ async function sendAttendancePrompts(slug, topic, session, weekKey) {
   const lines = [
     `<b>${escapeHtml(topic.title)} — ${session.label}</b> just finished. Mark attendance:`,
     "",
-    ...submissions.map((s, i) => `${i + 1}. <b>${escapeHtml(s.name)}</b>\n   <code>${escapeHtml(s.phone)}</code>`),
+    ...submissions.map((s, i) => `${i + 1}. <b>${escapeHtml(s.name)}</b>\n   <code>${escapeHtml(toLocalPhone(s.phone))}</code>`),
     "",
     "Tap a number to copy it, then: /attend &lt;number&gt; yes|no",
   ];

@@ -1,7 +1,7 @@
 /**
  * Telegram bot webhook — handles admin commands typed directly into the
  * Telegram chat with the bot: /today, /week, /stats, /topics, /search,
- * /attend, /teacher, /export, plus admin management (/addadmin,
+ * /attend, /teacher, /picked, /export, plus admin management (/addadmin,
  * /removeadmin, /listadmins, /myrole).
  *
  * One-time setup, after TELEGRAM_BOT_TOKEN is set in Netlify and deployed:
@@ -39,6 +39,8 @@ import {
   sydneyDateKey, sydneyTodayCalendarProxy, mondayOf, inRange,
 } from "./lib/reports.mjs";
 import { getRole, addAdmin, removeAdmin, listAdmins } from "./lib/admins.mjs";
+import { toLocalPhone, statusLabel } from "./lib/phone.mjs";
+import { toCsv } from "./lib/csv.mjs";
 
 const TOPICS = JSON.parse(
   readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
@@ -51,8 +53,8 @@ const MANAGE_ROLES = ["owner", "admin"];
  *  commands send their own reply (e.g. a document) instead of returning
  *  text for the dispatcher to send. */
 const COMMANDS = [
-  { key: "/today", match: (t) => t === "/today", roles: ALL_ROLES, html: true, run: () => buildTodayReport() },
-  { key: "/week", match: (t) => t === "/week", roles: ALL_ROLES, run: () => buildWeekReport() },
+  { key: "/today", match: (t) => t === "/today", roles: ALL_ROLES, direct: true, run: (_t, ctx) => handleTodayCommand(ctx.chatId) },
+  { key: "/week", match: (t) => t === "/week", roles: ALL_ROLES, direct: true, run: (_t, ctx) => handleWeekCommand(ctx.chatId) },
   { key: "/stats", match: (t) => t === "/stats", roles: ALL_ROLES, run: () => buildStatsReport() },
   { key: "/topics", match: (t) => t === "/topics", roles: ALL_ROLES, run: () => buildTopicsReport() },
   { key: "/myrole", match: (t) => t === "/myrole", roles: ALL_ROLES, run: (_t, ctx) => `Your role: ${ctx.role}` },
@@ -91,16 +93,18 @@ const HELP_TEXT = [
   "<b>Beyond Sundays</b>",
   "",
   "<b>Reports</b>",
-  "/today — today's signups (names + numbers)",
-  "/week — this week's signups by day",
+  "/today — today's signups (names + numbers + teacher/picked status), plus a CSV",
+  "/week — this week's signups by day, plus a full CSV",
   "/stats — overall statistics and growth",
   "/topics — enrollment count per topic",
   "",
   "<b>Manage a person</b> (find their number with /today or /search first)",
-  "/search <code>&lt;number&gt;</code> — find someone, e.g. /search 0402248977",
+  "/search <code>&lt;number&gt;</code> — find someone, e.g. /search 0412 345 678",
   "/attend <code>&lt;number&gt; yes|no</code> — mark whether they attended",
-  "/teacher <code>&lt;number&gt; &lt;name&gt;</code> — assign a teacher",
+  "/teacher <code>&lt;number&gt; &lt;name&gt;</code> — assign a teacher, e.g. /teacher 0455 987 654 Mr Lee",
   "/picked <code>&lt;number&gt; yes|no</code> — agreed to keep studying after meeting their teacher?",
+  "",
+  "<i>Attend/teacher/picked show as TBC until an admin sets them.</i>",
   "",
   "<b>Export</b>",
   "/export <code>week|month|year</code> — download that period as a CSV file",
@@ -163,6 +167,23 @@ export default async (req) => {
 
   return new Response("OK", { status: 200 });
 };
+
+async function handleTodayCommand(chatId) {
+  const { text, csvRows, dateLabel } = await buildTodayReport();
+  await sendTelegramMessage(chatId, text, { html: true });
+  if (csvRows.length > 1) {
+    await sendTelegramDocument(chatId, `beyond-sundays-today-${dateLabel.replace(/[^\w]+/g, "-")}.csv`, toCsv(csvRows));
+  }
+}
+
+async function handleWeekCommand(chatId) {
+  const { text, csvRows } = await buildWeekReport();
+  await sendTelegramMessage(chatId, text, { html: true });
+  if (csvRows.length > 1) {
+    const filename = `beyond-sundays-week-${customDateCode(sydneyTodayCalendarProxy())}.csv`;
+    await sendTelegramDocument(chatId, filename, toCsv(csvRows));
+  }
+}
 
 async function buildStatsReport() {
   const people = await getAllPeople();
@@ -241,7 +262,7 @@ async function handleRemoveAdminCommand(args) {
 const MAX_SEARCH_RESULTS = 10;
 
 async function buildSearchReport(query) {
-  if (!query) return "Usage: /search <number>, e.g. /search 0402248977";
+  if (!query) return "Usage: /search <number>, e.g. /search 0455 987 654";
 
   const matches = await searchPeopleByPhone(query);
   if (matches.length === 0) return `No one found matching "${query}".`;
@@ -250,14 +271,12 @@ async function buildSearchReport(query) {
     const joined = new Intl.DateTimeFormat("en-AU", {
       timeZone: TIMEZONE, day: "numeric", month: "long", year: "numeric",
     }).format(new Date(p.joinedAt));
-    const attended = p.attended === true ? "Yes" : p.attended === false ? "No" : "Not yet recorded";
-    const teacher = p.teacherAssigned ? escapeHtml(p.teacherAssigned) : "Not assigned";
-    const picked = p.picked === true ? "Yes" : p.picked === false ? "No" : "Not yet recorded";
+    const teacherSuffix = p.teacherAssigned ? ` (${escapeHtml(p.teacherAssigned)})` : "";
     return [
       `<b>${escapeHtml(p.name)}</b>`,
-      `<code>${escapeHtml(p.phone)}</code>`,
+      `<code>${escapeHtml(toLocalPhone(p.phone))}</code>`,
       `Joined: ${joined} · Topic: ${escapeHtml(p.topicTitle || p.topicSlug)}`,
-      `Attended: ${attended} · Teacher: ${teacher} · Picked: ${picked}`,
+      `Attended: ${statusLabel(p.attended)} · Teacher: ${statusLabel(p.teacherAssigned ? true : null)}${teacherSuffix} · Picked: ${statusLabel(p.picked)}`,
     ].join("\n");
   });
 
@@ -352,18 +371,17 @@ async function handleExportCommand(chatId, period) {
     const person = await getPersonByPhone(s.phone);
     const signedUp = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(s.createdAt);
     const topicTitle = TOPICS[s.topicSlug]?.title || s.topicSlug || "";
-    const attended = person?.attended === true ? "Yes" : person?.attended === false ? "No" : "";
-    const picked = person?.picked === true ? "Yes" : person?.picked === false ? "No" : "";
-    rows.push([s.name, s.phone, signedUp, topicTitle, attended, person?.teacherAssigned || "", picked]);
+    rows.push([
+      s.name,
+      toLocalPhone(s.phone),
+      signedUp,
+      topicTitle,
+      statusLabel(person?.attended ?? null),
+      person?.teacherAssigned || statusLabel(null),
+      statusLabel(person?.picked ?? null),
+    ]);
   }
 
-  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
   const filename = `beyond-sundays-${period}-${customDateCode(todayProxy)}.csv`;
-
-  await sendTelegramDocument(chatId, filename, csv);
-}
-
-function csvEscape(value) {
-  const s = String(value ?? "");
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  await sendTelegramDocument(chatId, filename, toCsv(rows));
 }
