@@ -161,27 +161,20 @@ export default async (req) => {
   return new Response("OK", { status: 200 });
 };
 
-// Below this many people, the chat message already lists everyone by
-// name and number — a CSV on top of that is just noise. Past it, a
-// spreadsheet actually beats scrolling (and it's also roughly where a
-// busy /week could start crowding Telegram's 4096-character limit).
-const CSV_WORTH_IT_ABOVE = 15;
-
+// /today and /week are text-only — no auto-generated CSV. /export is
+// the one deliberate place a file gets created, only when someone
+// actually asks for one, so repeatedly checking /today or /week never
+// spams the chat with fresh duplicate files. If a day/week has more
+// people than fit in one Telegram message, buildTodayReport/
+// buildWeekReport truncate the list themselves and point at /export.
 async function handleTodayCommand(chatId) {
-  const { text, csvRows, dateLabel } = await buildTodayReport();
+  const { text } = await buildTodayReport();
   await sendTelegramMessage(chatId, text, { html: true });
-  if (csvRows.length - 1 > CSV_WORTH_IT_ABOVE) {
-    await sendTelegramDocument(chatId, `beyond-sundays-today-${dateLabel.replace(/[^\w]+/g, "-")}.csv`, toCsv(csvRows));
-  }
 }
 
 async function handleWeekCommand(chatId) {
-  const { text, csvRows } = await buildWeekReport();
+  const { text } = await buildWeekReport();
   await sendTelegramMessage(chatId, text, { html: true });
-  if (csvRows.length - 1 > CSV_WORTH_IT_ABOVE) {
-    const filename = `beyond-sundays-week-${customDateCode(sydneyTodayCalendarProxy())}.csv`;
-    await sendTelegramDocument(chatId, filename, toCsv(csvRows));
-  }
 }
 
 async function buildListAdminsReport() {

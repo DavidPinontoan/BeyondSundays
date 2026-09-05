@@ -6,10 +6,16 @@
  *
  * /today and /week both cross-reference the people-store (attendance,
  * teacher, picked) against Netlify Forms submissions (accurate signup
- * timing/events), and return { text, csvRows } — `text` for the chat
- * message, `csvRows` (a 2D array, pass to lib/csv.mjs's toCsv) for the
- * attached file. A person with a field not yet set by an admin shows as
- * "TBC" rather than a hard Y/N (see lib/phone.mjs's statusLabel).
+ * timing/events). A person with a field not yet set by an admin shows
+ * as "TBC" rather than a hard Y/N (see lib/phone.mjs's statusLabel).
+ *
+ * buildTodayReport() returns { text } — /today is always just the chat
+ * message, truncating its own list (via joinWithLimit below) rather
+ * than ever attaching a file; /export is the one deliberate place a
+ * CSV gets generated. buildWeekReport() returns { text, csvRows } too,
+ * since weekly-digest.mjs's automatic Saturday-night report still
+ * attaches one (a single scheduled send, not something a person can
+ * spam by repeatedly checking /week).
  */
 
 import { fetchAllRsvpSubmissions } from "./netlify-forms.mjs";
@@ -59,6 +65,44 @@ function totalsLines(rows) {
   return [`Total meeting with teacher: ${withTeacher}`, `Total picked: ${picked}`];
 }
 
+// Telegram's real limit is 4096 characters; stay well under it so HTML
+// tags and Telegram's own overhead don't tip a message over.
+const TELEGRAM_SAFE_LIMIT = 3500;
+
+/** Assembles header + items (people, or whole day-blocks for /week) +
+ *  footer, but stops adding items once the message would risk exceeding
+ *  Telegram's length limit, noting how many were left out and pointing
+ *  at `hint` (e.g. "/export week") instead of silently truncating or
+ *  failing to send. Used instead of ever auto-attaching a CSV from
+ *  /today or /week — /export is the one deliberate place a file gets
+ *  generated, only when someone actually asks for it. `itemSeparator`
+ *  joins the kept items themselves (a blank line between /week's day
+ *  blocks, a single newline between /today's people); top-level
+ *  sections (header/body/hint/footer) always get a blank line between
+ *  them regardless. */
+function joinWithLimit(headerLines, items, footerLines, hint, itemSeparator = "\n") {
+  const headerText = headerLines.join("\n");
+  const footerText = footerLines.join("\n");
+  const budget = TELEGRAM_SAFE_LIMIT - headerText.length - footerText.length - 40;
+
+  const kept = [];
+  let used = 0;
+  for (const item of items) {
+    const cost = item.length + itemSeparator.length;
+    if (used + cost > budget) break;
+    kept.push(item);
+    used += cost;
+  }
+
+  const omitted = items.length - kept.length;
+  const sections = [headerText];
+  if (kept.length > 0) sections.push(kept.join(itemSeparator));
+  else if (items.length === 0) sections.push("No signups.");
+  if (omitted > 0) sections.push(`… and ${omitted} more — use ${hint} for the full list.`);
+  if (footerLines.length > 0) sections.push(footerText);
+  return sections.join("\n\n");
+}
+
 export async function buildTodayReport() {
   const submissions = await fetchAllRsvpSubmissions();
   const todayProxy = sydneyTodayCalendarProxy();
@@ -84,28 +128,14 @@ export async function buildTodayReport() {
     ].join("\n");
   });
 
-  const text = [
-    `<b>Today</b> (${rows.length}) — ${dateLabel}`,
-    ...(personLines.length > 0 ? ["", ...personLines] : ["", "No signups today."]),
-    "",
-    `Total: ${rows.length} signups`,
-    ...totalsLines(rows),
-  ].join("\n");
+  const text = joinWithLimit(
+    [`<b>Today</b> (${rows.length}) — ${dateLabel}`],
+    personLines,
+    [`Total: ${rows.length} signups`, ...totalsLines(rows)],
+    "/export week"
+  );
 
-  const csvRows = [
-    ["Name", "Number", "Topic", "Signed up", "Attended", "Teacher", "Picked"],
-    ...rows.map((r) => [
-      r.name,
-      toLocalPhone(r.phone),
-      r.topicTitle,
-      sydneyTimeLabel(r.createdAt),
-      r.attended,
-      r.teacherName || r.teacher,
-      r.picked,
-    ]),
-  ];
-
-  return { text, csvRows, dateLabel };
+  return { text };
 }
 
 export async function buildWeekReport() {
@@ -147,15 +177,15 @@ export async function buildWeekReport() {
     return [heading, ...people].join("\n");
   });
 
-  const text = [
-    "<b>Beyond Sundays — Weekly Report</b>",
-    "",
-    dayBlocks.join("\n\n"),
-    "",
-    `Total: ${total} signups`,
-    ...totalsLines(allRows),
-    growthLine,
-  ].join("\n");
+  // Each day is one atomic block here, so a week too long to fit drops
+  // whole trailing days rather than cutting a day's list mid-way.
+  const text = joinWithLimit(
+    ["<b>Beyond Sundays — Weekly Report</b>"],
+    dayBlocks,
+    [`Total: ${total} signups`, ...totalsLines(allRows), growthLine],
+    "/export week",
+    "\n\n"
+  );
 
   const csvRows = [["Day", "Topic", "Name", "Number", "Signed up", "Attended", "Teacher", "Picked"]];
   for (let i = 0; i < WEEK_DAY_FULL.length; i++) {

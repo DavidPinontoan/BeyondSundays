@@ -195,10 +195,6 @@ can also message the bot directly:
 - `/week` — the same per-person detail, grouped under each of the six
   days (Mon–Sat) with that day's topic, plus totals and growth % vs.
   the previous week
-
-Both attach a CSV too, but only once there are more than 15 people —
-below that, the chat message already lists everyone by name and number,
-so a spreadsheet on top is just noise.
 - `/search <number>` — find someone by mobile number (local `04XX XXX
   XXX` or international `+61 4XX XXX XXX`, spaces optional); shows join
   date, topic, and attended/teacher/picked status
@@ -213,6 +209,16 @@ so a spreadsheet on top is just noise.
   number, signed-up date, topic, attended, teacher, picked); one row per
   person even if they RSVP'd more than once in the period
 - `/myrole` — shows your own access level
+
+**`/today` and `/week` never auto-generate a file** — repeatedly checking
+either one would otherwise spam the chat with a fresh duplicate CSV every
+time. `/export` is the one deliberate place a file gets created, only
+when someone actually asks for it. If a day/week ever has more people
+than fit in one Telegram message, the list truncates itself with a
+"…and N more — use /export week" note rather than silently cutting off
+or failing to send. The automatic Saturday-night digest is the one
+exception — since that's a single scheduled send rather than something
+a person can spam, it still attaches a CSV alongside the text.
 
 **Attended/teacher/picked show as `TBC`** (to be confirmed) rather than a
 hard Y/N until an admin actually sets them via `/attend`, `/teacher`, or
