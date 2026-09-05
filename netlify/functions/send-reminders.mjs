@@ -42,7 +42,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { getStore } from "@netlify/blobs";
 import twilio from "twilio";
-import { sendAdminAlert } from "./lib/telegram.mjs";
+import { sendAdminAlert, escapeHtml } from "./lib/telegram.mjs";
 
 const TOPICS = JSON.parse(
   readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
@@ -148,13 +148,13 @@ async function sendAttendancePrompts(slug, topic, session, weekKey) {
   }
 
   const lines = [
-    `${topic.title} - ${session.label} just finished. Mark attendance:`,
+    `<b>${escapeHtml(topic.title)} — ${session.label}</b> just finished. Mark attendance:`,
     "",
-    ...submissions.map((s) => `${s.name} - ${s.phone}`),
+    ...submissions.map((s, i) => `${i + 1}. <b>${escapeHtml(s.name)}</b>\n   <code>${escapeHtml(s.phone)}</code>`),
     "",
-    "Use /attend <number> yes|no for each person.",
+    "Tap a number to copy it, then: /attend &lt;number&gt; yes|no",
   ];
-  await sendAdminAlert(lines.join("\n"));
+  await sendAdminAlert(lines.join("\n"), { html: true });
   await dedupStore.setJSON(dedupKey, true);
 
   return `Sent attendance nudge for ${topic.title} ${session.label} (${submissions.length} people).`;

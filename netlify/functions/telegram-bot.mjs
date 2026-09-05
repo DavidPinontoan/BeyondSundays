@@ -28,7 +28,7 @@
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { sendTelegramMessage, sendTelegramDocument } from "./lib/telegram.mjs";
+import { sendTelegramMessage, sendTelegramDocument, escapeHtml } from "./lib/telegram.mjs";
 import {
   searchPeopleByPhone, markAttendance, assignTeacher, markPicked, getPersonByPhone,
   getAllPeople, getTopicCounts,
@@ -51,13 +51,13 @@ const MANAGE_ROLES = ["owner", "admin"];
  *  commands send their own reply (e.g. a document) instead of returning
  *  text for the dispatcher to send. */
 const COMMANDS = [
-  { key: "/today", match: (t) => t === "/today", roles: ALL_ROLES, run: () => buildTodayReport() },
+  { key: "/today", match: (t) => t === "/today", roles: ALL_ROLES, html: true, run: () => buildTodayReport() },
   { key: "/week", match: (t) => t === "/week", roles: ALL_ROLES, run: () => buildWeekReport() },
   { key: "/stats", match: (t) => t === "/stats", roles: ALL_ROLES, run: () => buildStatsReport() },
   { key: "/topics", match: (t) => t === "/topics", roles: ALL_ROLES, run: () => buildTopicsReport() },
   { key: "/myrole", match: (t) => t === "/myrole", roles: ALL_ROLES, run: (_t, ctx) => `Your role: ${ctx.role}` },
   {
-    key: "/search", match: (t) => t.startsWith("/search"), roles: MANAGE_ROLES,
+    key: "/search", match: (t) => t.startsWith("/search"), roles: MANAGE_ROLES, html: true,
     run: (t) => buildSearchReport(t.slice("/search".length).trim()),
   },
   {
@@ -76,7 +76,7 @@ const COMMANDS = [
     key: "/export", match: (t) => t.startsWith("/export"), roles: MANAGE_ROLES, direct: true,
     run: (t, ctx) => handleExportCommand(ctx.chatId, t.slice("/export".length).trim().toLowerCase()),
   },
-  { key: "/listadmins", match: (t) => t === "/listadmins", roles: ["owner"], run: () => buildListAdminsReport() },
+  { key: "/listadmins", match: (t) => t === "/listadmins", roles: ["owner"], html: true, run: () => buildListAdminsReport() },
   {
     key: "/addadmin", match: (t) => t.startsWith("/addadmin"), roles: ["owner"],
     run: (t) => handleAddAdminCommand(t.slice("/addadmin".length).trim()),
@@ -88,26 +88,33 @@ const COMMANDS = [
 ];
 
 const HELP_TEXT = [
-  "Commands:",
-  "/today - today's signups",
-  "/week - this week's signups by day",
-  "/stats - overall statistics and growth",
-  "/topics - enrollment count per topic",
-  "/search <number> - find someone by mobile number, e.g. /search 0402248977",
-  "/attend <number> yes|no - mark whether they attended",
-  "/teacher <number> <teacher name> - assign a teacher",
-  "/picked <number> yes|no - after meeting their teacher, did they agree to keep studying?",
-  "/export week|month|year - download signups from that period as a CSV file",
-  "/myrole - show your own access level",
+  "<b>Beyond Sundays</b>",
+  "",
+  "<b>Reports</b>",
+  "/today — today's signups (names + numbers)",
+  "/week — this week's signups by day",
+  "/stats — overall statistics and growth",
+  "/topics — enrollment count per topic",
+  "",
+  "<b>Manage a person</b> (find their number with /today or /search first)",
+  "/search <code>&lt;number&gt;</code> — find someone, e.g. /search 0402248977",
+  "/attend <code>&lt;number&gt; yes|no</code> — mark whether they attended",
+  "/teacher <code>&lt;number&gt; &lt;name&gt;</code> — assign a teacher",
+  "/picked <code>&lt;number&gt; yes|no</code> — agreed to keep studying after meeting their teacher?",
+  "",
+  "<b>Export</b>",
+  "/export <code>week|month|year</code> — download that period as a CSV file",
+  "",
+  "/myrole — show your own access level",
 ].join("\n");
 
 const OWNER_HELP_TEXT = [
   HELP_TEXT,
   "",
-  "Owner-only:",
-  "/listadmins - list all admins/viewers",
-  "/addadmin <chat_id> admin|viewer [label] - grant access",
-  "/removeadmin <chat_id> - revoke access",
+  "<b>Owner-only</b>",
+  "/listadmins — list all admins/viewers",
+  "/addadmin <code>&lt;chat_id&gt; admin|viewer [label]</code> — grant access",
+  "/removeadmin <code>&lt;chat_id&gt;</code> — revoke access",
 ].join("\n");
 
 export default async (req) => {
@@ -138,7 +145,7 @@ export default async (req) => {
 
   const command = COMMANDS.find((c) => c.match(text));
   if (!command) {
-    await sendTelegramMessage(chatId, role === "owner" ? OWNER_HELP_TEXT : HELP_TEXT);
+    await sendTelegramMessage(chatId, role === "owner" ? OWNER_HELP_TEXT : HELP_TEXT, { html: true });
     return new Response("OK", { status: 200 });
   }
 
@@ -151,7 +158,7 @@ export default async (req) => {
   if (command.direct) {
     await command.run(text, ctx);
   } else {
-    await sendTelegramMessage(chatId, await command.run(text, ctx));
+    await sendTelegramMessage(chatId, await command.run(text, ctx), { html: !!command.html });
   }
 
   return new Response("OK", { status: 200 });
@@ -207,10 +214,12 @@ async function buildTopicsReport() {
 async function buildListAdminsReport() {
   const entries = await listAdmins();
   const lines = [
-    `owner: ${process.env.TELEGRAM_CHAT_ID}`,
-    ...entries.map((e) => `${e.role}: ${e.chatId}${e.label ? ` (${e.label})` : ""}`),
+    `owner: <code>${escapeHtml(process.env.TELEGRAM_CHAT_ID)}</code>`,
+    ...entries.map(
+      (e) => `${escapeHtml(e.role)}: <code>${escapeHtml(e.chatId)}</code>${e.label ? ` (${escapeHtml(e.label)})` : ""}`
+    ),
   ];
-  return ["Beyond Sundays - Admins", "", ...lines].join("\n");
+  return ["<b>Beyond Sundays — Admins</b>", "", ...lines].join("\n");
 }
 
 async function handleAddAdminCommand(args) {
@@ -242,20 +251,17 @@ async function buildSearchReport(query) {
       timeZone: TIMEZONE, day: "numeric", month: "long", year: "numeric",
     }).format(new Date(p.joinedAt));
     const attended = p.attended === true ? "Yes" : p.attended === false ? "No" : "Not yet recorded";
-    const teacher = p.teacherAssigned || "Not assigned";
+    const teacher = p.teacherAssigned ? escapeHtml(p.teacherAssigned) : "Not assigned";
     const picked = p.picked === true ? "Yes" : p.picked === false ? "No" : "Not yet recorded";
     return [
-      p.name,
-      p.phone,
-      `Joined: ${joined}`,
-      `Topic: ${p.topicTitle || p.topicSlug}`,
-      `Attended: ${attended}`,
-      `Teacher: ${teacher}`,
-      `Picked: ${picked}`,
+      `<b>${escapeHtml(p.name)}</b>`,
+      `<code>${escapeHtml(p.phone)}</code>`,
+      `Joined: ${joined} · Topic: ${escapeHtml(p.topicTitle || p.topicSlug)}`,
+      `Attended: ${attended} · Teacher: ${teacher} · Picked: ${picked}`,
     ].join("\n");
   });
 
-  const header = `Found ${matches.length} match${matches.length === 1 ? "" : "es"}${matches.length > MAX_SEARCH_RESULTS ? ` (showing first ${MAX_SEARCH_RESULTS})` : ""}:`;
+  const header = `Found <b>${matches.length}</b> match${matches.length === 1 ? "" : "es"}${matches.length > MAX_SEARCH_RESULTS ? ` (showing first ${MAX_SEARCH_RESULTS})` : ""}:`;
   return [header, "", blocks.join("\n\n")].join("\n");
 }
 

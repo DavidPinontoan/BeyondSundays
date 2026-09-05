@@ -34,7 +34,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import twilio from "twilio";
-import { sendAdminAlert } from "./lib/telegram.mjs";
+import { sendAdminAlert, escapeHtml } from "./lib/telegram.mjs";
 import { upsertPerson } from "./lib/people-store.mjs";
 import { getClientIp, checkAndBumpRate, checkAndBumpCooldown } from "./lib/rate-limit.mjs";
 
@@ -91,7 +91,10 @@ export default async (req) => {
   }
 
   try {
-    await sendAdminAlert(`New Signup\n${name}\n${phone}\n\n${topic.title} — ${topic.day} ${sessionLabel}`);
+    await sendAdminAlert(
+      `<b>New Signup</b>\n<b>${escapeHtml(name)}</b>\n<code>${escapeHtml(phone)}</code>\n\n${escapeHtml(topic.title)} — ${escapeHtml(topic.day)} ${sessionLabel}`,
+      { html: true }
+    );
   } catch (err) {
     console.error("Telegram alert failed:", err);
   }

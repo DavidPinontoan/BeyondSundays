@@ -15,7 +15,13 @@
  * Without both vars set, alerts are just logged instead of sent.
  */
 
-export async function sendTelegramMessage(chatId, text) {
+/** `html: true` lets the caller use a small set of Telegram-supported
+ *  tags (<b>, <i>, <code>, ...) — most usefully <code>, which renders as
+ *  monospace and is tap-to-copy in the Telegram app. Callers building
+ *  HTML must escape any user-supplied text themselves (see escapeHtml
+ *  below) — this function doesn't do it for them, since plain-text
+ *  callers would otherwise get stray entities in normal messages. */
+export async function sendTelegramMessage(chatId, text, { html = false } = {}) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
 
   if (!token || !chatId) {
@@ -26,7 +32,7 @@ export async function sendTelegramMessage(chatId, text) {
   const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text }),
+    body: JSON.stringify({ chat_id: chatId, text, ...(html ? { parse_mode: "HTML" } : {}) }),
   });
 
   if (!res.ok) {
@@ -34,9 +40,15 @@ export async function sendTelegramMessage(chatId, text) {
   }
 }
 
+/** Escapes text that will be interpolated into an HTML-mode message —
+ *  Telegram's HTML parser only needs these three characters escaped. */
+export function escapeHtml(s) {
+  return String(s ?? "").replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+}
+
 /** Convenience wrapper for one-way alerts to the configured admin chat. */
-export async function sendAdminAlert(text) {
-  return sendTelegramMessage(process.env.TELEGRAM_CHAT_ID, text);
+export async function sendAdminAlert(text, options) {
+  return sendTelegramMessage(process.env.TELEGRAM_CHAT_ID, text, options);
 }
 
 /** Sends a file (e.g. a CSV export) as a Telegram document. */

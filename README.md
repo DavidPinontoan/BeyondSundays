@@ -187,8 +187,9 @@ Every RSVP sends a "New Signup" alert to your Telegram chat (via
 `send-confirmation.mjs`), independent of whether Twilio is working. You
 can also message the bot directly:
 
-- `/today` — today's signups by name and time, plus running totals for
-  the week and month
+- `/today` — today's signups, numbered, with name and mobile number
+  (tap a number to copy it, then use it with `/attend`/`/teacher`/`/picked`),
+  plus running totals for the week and month
 - `/week` — signups per day, Monday through Saturday (this project's
   "week" ends Saturday night — there's no Sunday topic), plus growth %
   compared with the previous week
@@ -247,6 +248,15 @@ also fires on its own every Saturday night at 9:00 PM Sydney time —
 nobody has to remember to ask. Still left for a later pass: `/yesterday`
 `/month` `/all` with pagination, inline buttons on the signup alert and
 reports, and missed-class re-engagement.
+
+**Two separate data sources, by design**: `/today` and `/week` read real
+Netlify Forms submissions (an event log — every submission, including
+repeats); `/stats`, `/topics`, and `/search` read the people-store (one
+current snapshot per phone number). In normal use these stay in sync,
+since a real RSVP creates both at once. They can only drift apart from
+testing that calls `send-confirmation.mjs` directly instead of through
+the real form (which only touches the people-store) — not something
+that happens from the live site itself.
 
 ## Project layout
 

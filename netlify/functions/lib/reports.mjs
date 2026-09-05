@@ -6,6 +6,7 @@
  */
 
 import { fetchAllRsvpSubmissions } from "./netlify-forms.mjs";
+import { escapeHtml } from "./telegram.mjs";
 
 export const TIMEZONE = "Australia/Sydney";
 export const WEEK_DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -28,15 +29,19 @@ export async function buildTodayReport() {
   const weekdayName = new Intl.DateTimeFormat("en-AU", { timeZone: TIMEZONE, weekday: "long" }).format(todayProxy);
   const dateLabel = `${customDateCode(todayProxy)} (${weekdayName})`;
 
+  const list = todays.map(
+    (s, i) =>
+      `${i + 1}. <b>${escapeHtml(s.name)}</b>\n   <code>${escapeHtml(s.phone)}</code> · ${sydneyTimeLabel(s.createdAt)}`
+  );
+
   return [
-    `Beyond Sundays - Today (${dateLabel})`,
+    `<b>Beyond Sundays — Today</b> (${dateLabel})`,
     "",
-    `New signups: ${todays.length}`,
-    ...todays.map((s) => `${s.name} - ${sydneyTimeLabel(s.createdAt)}`),
+    `New signups: <b>${todays.length}</b>`,
+    ...(list.length > 0 ? ["", ...list] : []),
     "",
-    `Today: ${todays.length}`,
-    `This week: ${weekCount}`,
-    `This month: ${monthCount}`,
+    `Today: ${todays.length} · This week: ${weekCount} · This month: ${monthCount}`,
+    ...(todays.length > 0 ? ["", "Tap a number to copy it, then: /attend &lt;number&gt; yes|no"] : []),
   ].join("\n");
 }
 
