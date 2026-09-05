@@ -34,6 +34,7 @@ export async function upsertPerson({ name, phone, topicSlug, topicTitle, session
     attended: existing?.attended ?? null,
     teacherAssigned: existing?.teacherAssigned ?? null,
     interested: existing?.interested ?? null,
+    picked: existing?.picked ?? null,
   };
 
   await store().setJSON(key, record);
@@ -104,6 +105,18 @@ export async function assignTeacher(phone, teacherName) {
   const record = await store().get(key, { type: "json" });
   if (!record) return null;
   record.teacherAssigned = teacherName;
+  await store().setJSON(key, record);
+  return record;
+}
+
+/** Whether this person, after meeting their assigned teacher in person,
+ *  agreed to keep studying — a separate outcome from just being assigned
+ *  a teacher in the first place. */
+export async function markPicked(phone, picked) {
+  const key = keyOf(phone);
+  const record = await store().get(key, { type: "json" });
+  if (!record) return null;
+  record.picked = picked;
   await store().setJSON(key, record);
   return record;
 }

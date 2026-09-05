@@ -175,6 +175,9 @@ can also message the bot directly:
   Telegram nudge with the RSVP list arrives an hour after each showing —
   see "How the SMS flow works" above)
 - `/teacher <number> <teacher name>` — assign a teacher to follow up with them
+- `/picked <number> yes|no` — after they've met their assigned teacher in
+  person, did they agree to keep studying? (a separate outcome from just
+  being assigned one)
 - `/export week|month|year` — sends a CSV of that period's signups (name,
   number, signed-up date, topic, attended, teacher); one row per person
   even if they RSVP'd more than once in the period
@@ -215,9 +218,7 @@ An automatic weekly digest (`weekly-digest.mjs`, same report as `/week`)
 also fires on its own every Saturday night at 9:00 PM Sydney time —
 nobody has to remember to ask. Still left for a later pass: `/yesterday`
 `/month` `/all` with pagination, inline buttons on the signup alert and
-reports, and missed-class re-engagement. One field from the original
-spec — "agree to study 3x (picked)" under `/stats` — isn't implemented
-since there's no tracked field for what that should actually mean yet.
+reports, and missed-class re-engagement.
 
 ## Project layout
 

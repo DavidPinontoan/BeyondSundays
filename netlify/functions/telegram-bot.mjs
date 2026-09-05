@@ -30,7 +30,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { sendTelegramMessage, sendTelegramDocument } from "./lib/telegram.mjs";
 import {
-  searchPeopleByPhone, markAttendance, assignTeacher, getPersonByPhone,
+  searchPeopleByPhone, markAttendance, assignTeacher, markPicked, getPersonByPhone,
   getAllPeople, getTopicCounts,
 } from "./lib/people-store.mjs";
 import { fetchAllRsvpSubmissions } from "./lib/netlify-forms.mjs";
@@ -69,6 +69,10 @@ const COMMANDS = [
     run: (t) => handleTeacherCommand(t.slice("/teacher".length).trim()),
   },
   {
+    key: "/picked", match: (t) => t.startsWith("/picked"), roles: MANAGE_ROLES,
+    run: (t) => handlePickedCommand(t.slice("/picked".length).trim()),
+  },
+  {
     key: "/export", match: (t) => t.startsWith("/export"), roles: MANAGE_ROLES, direct: true,
     run: (t, ctx) => handleExportCommand(ctx.chatId, t.slice("/export".length).trim().toLowerCase()),
   },
@@ -92,6 +96,7 @@ const HELP_TEXT = [
   "/search <number> - find someone by mobile number, e.g. /search 0402248977",
   "/attend <number> yes|no - mark whether they attended",
   "/teacher <number> <teacher name> - assign a teacher",
+  "/picked <number> yes|no - after meeting their teacher, did they agree to keep studying?",
   "/export week|month|year - download signups from that period as a CSV file",
   "/myrole - show your own access level",
 ].join("\n");
@@ -166,6 +171,7 @@ async function buildStatsReport() {
   const thisMonth = people.filter((p) => joinedKey(p) >= monthStartKey && joinedKey(p) <= todayKey).length;
   const lastMonth = people.filter((p) => joinedKey(p) >= lastMonthStartKey && joinedKey(p) <= lastMonthEndKey).length;
   const withTeacher = people.filter((p) => p.teacherAssigned).length;
+  const picked = people.filter((p) => p.picked === true).length;
 
   const growthLine =
     lastMonth > 0
@@ -179,6 +185,7 @@ async function buildStatsReport() {
     `This week: ${thisWeek}`,
     `This month: ${thisMonth}`,
     `Continuing with a teacher: ${withTeacher}`,
+    `Agreed to keep studying (picked): ${picked}`,
     "",
     "Growth",
     `Last month: ${lastMonth}`,
@@ -236,6 +243,7 @@ async function buildSearchReport(query) {
     }).format(new Date(p.joinedAt));
     const attended = p.attended === true ? "Yes" : p.attended === false ? "No" : "Not yet recorded";
     const teacher = p.teacherAssigned || "Not assigned";
+    const picked = p.picked === true ? "Yes" : p.picked === false ? "No" : "Not yet recorded";
     return [
       p.name,
       p.phone,
@@ -243,6 +251,7 @@ async function buildSearchReport(query) {
       `Topic: ${p.topicTitle || p.topicSlug}`,
       `Attended: ${attended}`,
       `Teacher: ${teacher}`,
+      `Picked: ${picked}`,
     ].join("\n");
   });
 
@@ -286,6 +295,19 @@ async function handleTeacherCommand(args) {
   return `Assigned ${teacherName} as ${record.name}'s teacher.`;
 }
 
+async function handlePickedCommand(args) {
+  const [numberArg, statusArg] = args.split(/\s+/);
+  if (!numberArg || !statusArg) return "Usage: /picked <number> yes|no";
+  const status = statusArg.toLowerCase();
+  if (status !== "yes" && status !== "no") return "Usage: /picked <number> yes|no";
+
+  const { person, error } = await resolveOnePerson(numberArg);
+  if (error) return error;
+
+  const record = await markPicked(person.phone, status === "yes");
+  return `Marked ${record.name} as ${status === "yes" ? "picked (agreed to keep studying)" : "not picked"}.`;
+}
+
 const EXPORT_PERIODS = ["week", "month", "year"];
 
 async function handleExportCommand(chatId, period) {
@@ -319,13 +341,14 @@ async function handleExportCommand(chatId, period) {
     latestByPhone.set(s.phone.replace(/\s/g, ""), s);
   }
 
-  const rows = [["Name", "Number", "Signed up", "Topic", "Attended", "Teacher"]];
+  const rows = [["Name", "Number", "Signed up", "Topic", "Attended", "Teacher", "Picked"]];
   for (const s of latestByPhone.values()) {
     const person = await getPersonByPhone(s.phone);
     const signedUp = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(s.createdAt);
     const topicTitle = TOPICS[s.topicSlug]?.title || s.topicSlug || "";
     const attended = person?.attended === true ? "Yes" : person?.attended === false ? "No" : "";
-    rows.push([s.name, s.phone, signedUp, topicTitle, attended, person?.teacherAssigned || ""]);
+    const picked = person?.picked === true ? "Yes" : person?.picked === false ? "No" : "";
+    rows.push([s.name, s.phone, signedUp, topicTitle, attended, person?.teacherAssigned || "", picked]);
   }
 
   const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
