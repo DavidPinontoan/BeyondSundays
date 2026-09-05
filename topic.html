@@ -48,6 +48,13 @@
         <input type="hidden" name="topic" id="topicSlugInput" />
         <p class="rsvp__honeypot"><label>Leave this field empty: <input name="rsvp-hp" tabindex="-1" autocomplete="off" /></label></p>
 
+        <div class="rsvp__row rsvp__row--name">
+          <input type="text" name="name" id="nameInput" placeholder="Your name" autocomplete="name" required />
+        </div>
+        <div class="rsvp__row">
+          <input type="tel" name="phone" id="phoneInput" placeholder="04XX XXX XXX" autocomplete="tel" required />
+          <button type="submit" class="btn btn--gold" id="rsvpSubmit">Reserve</button>
+        </div>
         <div class="rsvp__row rsvp__sessions" id="rsvpSessions">
           <span class="rsvp__sessions-label">Which showing?</span>
           <label class="rsvp__session-option">
@@ -56,13 +63,6 @@
           <label class="rsvp__session-option">
             <input type="radio" name="session" value="9pm" /> 9:00 PM
           </label>
-        </div>
-        <div class="rsvp__row rsvp__row--name">
-          <input type="text" name="name" id="nameInput" placeholder="Your name" autocomplete="name" required />
-        </div>
-        <div class="rsvp__row">
-          <input type="tel" name="phone" id="phoneInput" placeholder="04XX XXX XXX" autocomplete="tel" required />
-          <button type="submit" class="btn btn--gold" id="rsvpSubmit">Reserve</button>
         </div>
         <div class="rsvp__error" id="rsvpError">Please pick a showing, and enter your name and a valid Australian mobile number (04XX XXX XXX or +61 4XX XXX XXX).</div>
         <p class="rsvp__note">We'll only use this number to text you about this study. An hour before your showing, we'll text asking you to confirm you're still coming.</p>
