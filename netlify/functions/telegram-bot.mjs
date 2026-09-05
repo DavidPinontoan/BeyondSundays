@@ -26,8 +26,6 @@
  * registering the webhook and sending /today.
  */
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { sendTelegramMessage, sendTelegramDocument, escapeHtml } from "./lib/telegram.mjs";
 import {
   searchPeopleByPhone, markAttendance, assignTeacher, markPicked, getPersonByPhone,
@@ -41,10 +39,7 @@ import {
 import { getRole, addAdmin, removeAdmin, listAdmins } from "./lib/admins.mjs";
 import { toLocalPhone, statusLabel } from "./lib/phone.mjs";
 import { toCsv } from "./lib/csv.mjs";
-
-const TOPICS = JSON.parse(
-  readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
-);
+import { TOPICS } from "./lib/topics.mjs";
 
 const ALL_ROLES = ["owner", "admin", "viewer"];
 const MANAGE_ROLES = ["owner", "admin"];

@@ -38,16 +38,11 @@
  * function's logs).
  */
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { getStore } from "@netlify/blobs";
 import twilio from "twilio";
 import { sendAdminAlert, escapeHtml } from "./lib/telegram.mjs";
 import { toLocalPhone } from "./lib/phone.mjs";
-
-const TOPICS = JSON.parse(
-  readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
-);
+import { TOPICS } from "./lib/topics.mjs";
 
 const TIMEZONE = "Australia/Sydney";
 const WINDOW_MINUTES = 15; // act once within the first 15 min after the top of the hour

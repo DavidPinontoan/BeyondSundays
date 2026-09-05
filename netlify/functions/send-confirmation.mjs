@@ -31,20 +31,15 @@
  * Without them, sends are just logged.
  */
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import twilio from "twilio";
 import { sendAdminAlert, escapeHtml } from "./lib/telegram.mjs";
 import { upsertPerson } from "./lib/people-store.mjs";
 import { getClientIp, checkAndBumpRate, checkAndBumpCooldown } from "./lib/rate-limit.mjs";
 import { toLocalPhone } from "./lib/phone.mjs";
+import { TOPICS } from "./lib/topics.mjs";
 
 const IP_LIMIT = { max: 5, windowMs: 10 * 60 * 1000 };
 const PHONE_COOLDOWN_MS = 5 * 60 * 1000;
-
-const TOPICS = JSON.parse(
-  readFileSync(fileURLToPath(new URL("./topics-schedule.json", import.meta.url)), "utf8")
-);
 
 export default async (req) => {
   if (req.method !== "POST") {

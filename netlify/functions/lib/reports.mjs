@@ -12,16 +12,11 @@
  * "TBC" rather than a hard Y/N (see lib/phone.mjs's statusLabel).
  */
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { fetchAllRsvpSubmissions } from "./netlify-forms.mjs";
 import { escapeHtml } from "./telegram.mjs";
 import { getPersonByPhone } from "./people-store.mjs";
 import { toLocalPhone, statusLabel } from "./phone.mjs";
-
-const TOPICS = JSON.parse(
-  readFileSync(fileURLToPath(new URL("../topics-schedule.json", import.meta.url)), "utf8")
-);
+import { TOPICS } from "./topics.mjs";
 
 export const TIMEZONE = "Australia/Sydney";
 export const WEEK_DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
