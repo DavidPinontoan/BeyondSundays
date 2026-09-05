@@ -146,14 +146,12 @@ Telegram alerts are unaffected by this and work regardless.
    the Y/N text — that reply is purely a headcount signal for you, not a
    gate on getting the link), then texts `ORGANIZER_PHONE` one summary
    line with the confirmed/declined/no-reply tally.
-4. **One hour after their showing starts** — `send-reminders.mjs` texts
-   "did you attend? Reply Y or N". This reply is written straight into
-   that person's attendance field in the people-store via `sms-reply.mjs`
-   (same effect as the admin's manual `/attend` bot command), so
-   `/search` and `/export` reflect it automatically. If someone never
-   replied to the "still coming?" text before showtime, that older
-   question is simply dropped — asking it after the fact wouldn't mean
-   anything once the session's already happened.
+4. **One hour after their showing starts** — `send-reminders.mjs` sends
+   *you* (the admin) a Telegram message listing everyone who RSVP'd for
+   that showing, so you can mark attendance with `/attend <number>
+   yes|no` per person. This one's Telegram, not SMS — Telegram already
+   works today, unlike Twilio, which is still blocked on the trial-account
+   restriction below.
 
 ### Telegram admin bot
 
@@ -169,8 +167,9 @@ can also message the bot directly:
 - `/search <number>` — find someone by mobile number (local `04XX XXX
   XXX` or international `+61 4XX XXX XXX`, spaces optional); shows join
   date, topic, attendance, and teacher assignment
-- `/attend <number> yes|no` — mark whether they attended (this also
-  happens automatically — see "How the SMS flow works" above)
+- `/attend <number> yes|no` — mark whether they attended (an automatic
+  Telegram nudge with the RSVP list arrives an hour after each showing —
+  see "How the SMS flow works" above)
 - `/teacher <number> <teacher name>` — assign a teacher to follow up with them
 - `/export week|month|year` — sends a CSV of that period's signups (name,
   number, signed-up date, topic, attended, teacher); one row per person
