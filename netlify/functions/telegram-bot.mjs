@@ -21,8 +21,8 @@
  * registering the webhook and sending /today.
  */
 
-import { sendTelegramMessage } from "./lib/telegram.mjs";
-import { searchPeopleByPhone, markAttendance, assignTeacher } from "./lib/people-store.mjs";
+import { sendTelegramMessage, sendTelegramDocument } from "./lib/telegram.mjs";
+import { searchPeopleByPhone, markAttendance, assignTeacher, getAllPeople } from "./lib/people-store.mjs";
 import { TIMEZONE, buildTodayReport, buildWeekReport } from "./lib/reports.mjs";
 
 export default async (req) => {
@@ -56,6 +56,8 @@ export default async (req) => {
     await sendTelegramMessage(chatId, await handleAttendCommand(text.slice("/attend".length).trim()));
   } else if (text.startsWith("/teacher")) {
     await sendTelegramMessage(chatId, await handleTeacherCommand(text.slice("/teacher".length).trim()));
+  } else if (text === "/export") {
+    await handleExportCommand(chatId);
   } else {
     await sendTelegramMessage(
       chatId,
@@ -66,6 +68,7 @@ export default async (req) => {
         "/search <number> - find someone by mobile number, e.g. /search 0402248977",
         "/attend <number> yes|no - mark whether they attended",
         "/teacher <number> <teacher name> - assign a teacher",
+        "/export - download all signups as a CSV file",
       ].join("\n")
     );
   }
@@ -135,4 +138,29 @@ async function handleTeacherCommand(args) {
 
   const record = await assignTeacher(person.phone, teacherName);
   return `Assigned ${teacherName} as ${record.name}'s teacher.`;
+}
+
+async function handleExportCommand(chatId) {
+  const people = await getAllPeople();
+  if (people.length === 0) {
+    await sendTelegramMessage(chatId, "No signups to export yet.");
+    return;
+  }
+
+  const rows = [["Name", "Number", "Joined", "Topic", "Attended", "Teacher"]];
+  for (const p of people) {
+    const joined = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(new Date(p.joinedAt));
+    const attended = p.attended === true ? "Yes" : p.attended === false ? "No" : "";
+    rows.push([p.name, p.phone, joined, p.topicTitle || p.topicSlug || "", attended, p.teacherAssigned || ""]);
+  }
+
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  const filename = `beyond-sundays-signups-${new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(new Date())}.csv`;
+
+  await sendTelegramDocument(chatId, filename, csv);
+}
+
+function csvEscape(value) {
+  const s = String(value ?? "");
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }

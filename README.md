@@ -163,6 +163,7 @@ can also message the bot directly:
   date, topic, attendance, and teacher assignment
 - `/attend <number> yes|no` — mark whether they attended
 - `/teacher <number> <teacher name>` — assign a teacher to follow up with them
+- `/export` — sends a CSV file of every signup (name, number, joined date, topic, attended, teacher)
 
 Only messages from `TELEGRAM_CHAT_ID` get a reply; anyone else who finds
 the bot is silently ignored.
@@ -177,9 +178,9 @@ at their first-ever signup.
 
 An automatic weekly digest (`weekly-digest.mjs`, same report as `/week`)
 also fires on its own every Saturday night at 9:00 PM Sydney time —
-nobody has to remember to ask. Still left for a later pass: CSV export
-and permission levels (right now there's exactly one admin,
-`TELEGRAM_CHAT_ID`).
+nobody has to remember to ask. Still left for a later pass: permission
+levels (right now there's exactly one admin, `TELEGRAM_CHAT_ID`) and
+missed-class re-engagement.
 
 ## Project layout
 
@@ -200,7 +201,7 @@ netlify.toml               Netlify build config: publish "." and the functions d
 netlify/functions/send-reminders.mjs        Scheduled (15-min) function: 1hr-before Y/N prompts, Zoom links at showtime, organizer tally
 netlify/functions/send-confirmation.mjs      Fired on RSVP submit: instant "you're confirmed" text, Telegram alert, people-store upsert
 netlify/functions/sms-reply.mjs               Twilio inbound webhook: records Y/N replies
-netlify/functions/telegram-bot.mjs             Telegram webhook: /today, /week, /search, /attend, /teacher
+netlify/functions/telegram-bot.mjs             Telegram webhook: /today, /week, /search, /attend, /teacher, /export
 netlify/functions/weekly-digest.mjs             Scheduled (15-min) function: automatic /week report every Saturday 9pm
 netlify/functions/lib/telegram.mjs              Telegram Bot API helper (setup instructions inline)
 netlify/functions/lib/netlify-forms.mjs          Fetches all RSVP submissions across topics, paginated

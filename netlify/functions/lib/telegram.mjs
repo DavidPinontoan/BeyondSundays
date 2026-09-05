@@ -38,3 +38,26 @@ export async function sendTelegramMessage(chatId, text) {
 export async function sendAdminAlert(text) {
   return sendTelegramMessage(process.env.TELEGRAM_CHAT_ID, text);
 }
+
+/** Sends a file (e.g. a CSV export) as a Telegram document. */
+export async function sendTelegramDocument(chatId, filename, content, mimeType = "text/csv") {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+
+  if (!token || !chatId) {
+    console.log(`[TELEGRAM SCAFFOLD] Would send document "${filename}" to ${chatId}`);
+    return;
+  }
+
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  form.append("document", new Blob([content], { type: mimeType }), filename);
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+    method: "POST",
+    body: form,
+  });
+
+  if (!res.ok) {
+    console.error(`Telegram document send failed: ${res.status} ${await res.text()}`);
+  }
+}
