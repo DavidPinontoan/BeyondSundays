@@ -1,6 +1,6 @@
 /**
  * Scheduled Netlify Function — runs every 15 minutes. For whichever topic
- * airs today (matched by weekday against topics-schedule.json), and for
+ * airs today (matched by weekday against lib/topics.mjs), and for
  * each of its two showings (7:00 PM and 9:00 PM Sydney time):
  *
  *   - One hour before that showing: texts everyone who RSVP'd for it

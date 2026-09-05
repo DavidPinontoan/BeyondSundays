@@ -110,7 +110,7 @@ manually invoke `send-reminders.mjs` before deploying. Requires Node.js.
    `https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<your-site>.netlify.app/.netlify/functions/telegram-bot`
    once in a browser (fill in your real token and site URL). After this,
    `getUpdates` stops returning anything — that's expected, not an error.
-6. Fill in real Zoom links in `netlify/functions/topics-schedule.json`
+6. Fill in real Zoom links in `netlify/functions/lib/topics.mjs`
    (currently placeholders).
 
 `send-reminders.mjs`, `send-confirmation.mjs`, `sms-reply.mjs`, and
@@ -298,13 +298,13 @@ netlify/functions/lib/admins.mjs                 Role lookup/management (owner/a
 netlify/functions/lib/rate-limit.mjs              IP rate limit + phone cooldown helpers (see Abuse protection)
 netlify/functions/lib/phone.mjs                   Local "04XX XXX XXX" display formatting + Y/N/TBC labels
 netlify/functions/lib/csv.mjs                      Tiny 2D-array-to-CSV-string helper, shared by /today, /week, /export
-netlify/functions/topics-schedule.json       day/title/Zoom link per topic, read by the functions above
+netlify/functions/lib/topics.mjs       day/title/Zoom link per topic, read by the functions above
 ```
 
 ## Still to fill in
 
 - Final topic descriptions (`js/data.js`, `description`/`title` fields — currently placeholders)
-- Real Zoom links (`netlify/functions/topics-schedule.json`, `zoomLink` fields)
+- Real Zoom links (`netlify/functions/lib/topics.mjs`, `zoomLink` fields)
 - Hero tagline copy (`index.html`, `.hero__tagline`)
 - Netlify + Twilio environment variables, incl. `ORGANIZER_PHONE` (see Deploying to Netlify above)
 - Twilio's inbound-SMS webhook pointed at `sms-reply.mjs` (see Deploying to Netlify above) — without this, Y/N replies are received by Twilio but never recorded
