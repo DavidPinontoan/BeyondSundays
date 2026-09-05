@@ -161,10 +161,16 @@ export default async (req) => {
   return new Response("OK", { status: 200 });
 };
 
+// Below this many people, the chat message already lists everyone by
+// name and number — a CSV on top of that is just noise. Past it, a
+// spreadsheet actually beats scrolling (and it's also roughly where a
+// busy /week could start crowding Telegram's 4096-character limit).
+const CSV_WORTH_IT_ABOVE = 15;
+
 async function handleTodayCommand(chatId) {
   const { text, csvRows, dateLabel } = await buildTodayReport();
   await sendTelegramMessage(chatId, text, { html: true });
-  if (csvRows.length > 1) {
+  if (csvRows.length - 1 > CSV_WORTH_IT_ABOVE) {
     await sendTelegramDocument(chatId, `beyond-sundays-today-${dateLabel.replace(/[^\w]+/g, "-")}.csv`, toCsv(csvRows));
   }
 }
@@ -172,7 +178,7 @@ async function handleTodayCommand(chatId) {
 async function handleWeekCommand(chatId) {
   const { text, csvRows } = await buildWeekReport();
   await sendTelegramMessage(chatId, text, { html: true });
-  if (csvRows.length > 1) {
+  if (csvRows.length - 1 > CSV_WORTH_IT_ABOVE) {
     const filename = `beyond-sundays-week-${customDateCode(sydneyTodayCalendarProxy())}.csv`;
     await sendTelegramDocument(chatId, filename, toCsv(csvRows));
   }

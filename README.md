@@ -191,10 +191,14 @@ can also message the bot directly:
   picked — not just whatever airs today, since the RSVP form works on
   any topic's page at any time), each numbered with name, mobile number
   (tap to copy), their topic, and attended/teacher/picked status, plus
-  totals (signups, meeting-with-teacher, picked) and a CSV attachment
+  totals (signups, meeting-with-teacher, picked)
 - `/week` — the same per-person detail, grouped under each of the six
   days (Mon–Sat) with that day's topic, plus totals and growth % vs.
-  the previous week, and a full CSV attachment
+  the previous week
+
+Both attach a CSV too, but only once there are more than 15 people —
+below that, the chat message already lists everyone by name and number,
+so a spreadsheet on top is just noise.
 - `/search <number>` — find someone by mobile number (local `04XX XXX
   XXX` or international `+61 4XX XXX XXX`, spaces optional); shows join
   date, topic, and attended/teacher/picked status
